@@ -33,7 +33,7 @@ while
 
 
 ;returns stateList -- the state represented by a list
-(define M-state
+(define M-state ;returns stateList
   (lambda (lis stateList)
     (cond
       [(null? lis) stateList]
@@ -48,14 +48,14 @@ while
       [(eq? (comand lis) 'return) (M-state (statement lis) stateList)]
       [else 'placeholder]))) ;adjust this
 
-(define M-declare
+(define M-declare ;returns updated stateList
   (lambda (lis stateList)
     (if (null? (rightoperand lis))
         (AddBinding (leftoperand lis) stateList) ;declare only
         (M-assign lis (AddBinding (leftoperand lis) stateList))))) ;declare and assign
       
 
-(define M-assign
+(define M-assign ;returns updated stateList
   (lambda (lis stateList)
     (cond
       [(not (declared? (leftoperand lis) stateList) (error 'Interpreter "Variable not declared. :("))]
@@ -63,13 +63,13 @@ while
       [else (ChangeBinding (leftoperand lis) (M-expression (rightOperand lis) stateList) stateList)])))
        
 ;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
-(define M-expression
+(define M-expression ;returns number if math, boolean if not
   (lambda (lis)
     (if (math? (operator lis)) ;checks if comand is a mathematical expression
         (M-integer lis stateList) 
         (M-boolean lis stateList)))) ;expressions can only be mathematical or boolean, might be a source of bugs (not checking if it is a boolean expression)
 
-;tests if val is a number or math operator
+;tests if val is a number or math operator,  returning #t if it is, #f otherwise
 (define math?
   (lambda (val)
     (cond
@@ -89,8 +89,8 @@ while
 |#
 
 
-;AddBinding takes a var name and the statelist, creates a new binding with given var
-(define AddBinding
+;AddBinding takes a var name and the statelist, creates a new binding with given var 
+(define AddBinding ;returns updated stateList
   (lambda (var stateList)
     (if (declared? var stateList)
         (error 'Interpreter "Variable already declared."
@@ -107,7 +107,7 @@ while
 
 
 ;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
-(define M-integer ;<op> <operand> <operand>
+(define M-integer ;returns a number
   (lambda (lis)
     (cond
       [(number? lis) lis]
@@ -121,7 +121,7 @@ while
 
 
 ;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
-(define M-boolean
+(define M-boolean ;returns #t or #f
   (lambda (lis)
     (cond
       [(eq? lis 'true) #t]
