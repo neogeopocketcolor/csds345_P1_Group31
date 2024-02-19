@@ -1,0 +1,71 @@
+#lang racket
+(require "simpleParser.rkt")
+
+(define comand caar)
+(define statement car)
+(define nextStatement cdr)
+
+
+
+;returns stateList -- the state represented by a list
+(define M-state
+  (lambda (lis stateList)
+    (cond
+      [(null? lis) stateList]
+      [(eq? (comand lis) '=) (M-state (nextStatement lis) (M-assign lis stateList))]
+      [(eq? (comand lis) 'while) 
+      [(eq? (comand lis) 'if) (
+
+
+
+
+
+
+(define M-expression
+;[(math? (comand lis) (M-state (nextStatement lis) (M-integer lis stateList)))] ;checks if comand is a mathematical expression
+      ;[(bool? (comand lis) (M-state (nextStatement lis) (M-boolean lis stateList)))] ;checks if comand is a boolean expression
+
+
+
+
+
+
+
+
+
+
+
+
+(define operator car)
+(define leftoperand cadr)
+(define rightoperand caddr)
+
+
+
+
+;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
+(define M-integer ;<op> <operand> <operand>
+  (lambda (lis)
+    (cond
+      [(number? lis) lis]
+      [(eq? (operator lis) '+) (+ (M-integer (leftoperand lis)) (M-integer (rightoperand lis)))]
+      [(and (eq? (operator lis) '-) (null? (rightoperand lis))) (- 0 (M-integer (leftoperand lis)))]
+      [(eq? (operator lis) '-) (- (M-integer (leftoperand lis)) (M-integer (rightoperand lis)))]
+      [(eq? (operator lis) '*) (* (M-integer (leftoperand lis)) (M-integer (rightoperand lis)))]
+      [(eq? (operator lis) '/) (quotient (M-integer (leftoperand lis)) (M-integer (rightoperand lis)))]
+      [(eq? (operator lis) '%) (remainder (M-integer (leftoperand lis)) (M-integer (rightoperand lis)))])))
+
+
+;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
+(define M-boolean
+  (lambda (lis)
+    (cond
+      [(eq? lis 'true) #t]
+      [(eq? lis 'false) #f]
+      [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis)) (M-boolean (rightoperand lis)))]
+      [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis)) (M-boolean (rightoperand lis)))]
+      [(eq? (operator lis) '!)  (not (M-boolean leftoperand lis))]
+      [(eq? (operator lis) '==) (eq? (M-expression (leftoperand lis)) (M-expression (rightoperand lis)))]
+      [(eq? (operator lis) '
+      
+    
