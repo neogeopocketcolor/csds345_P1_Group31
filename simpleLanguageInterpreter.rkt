@@ -37,12 +37,14 @@ while
       [(null? lis) stateList]
       [(eq? (comand lis) '=)      (M-state (nextStatement lis) (M-assign (statement lis) stateList))]
       [(eq? (comand lis) 'var)    (M-state (nextStatement lis) (M-declare (statement lis) stateList))]
-      [(eq? (comand lis) 'if)     (M-state (nextStatement lis) (if (condition lis)
+      [(eq? (comand lis) 'if)     (M-state (nextStatement lis) (if (M-boolean (condition lis))
                                                                    (M-state (statement1 lis))
                                                                    (if (not (null? (M-else lis)))
                                                                        (M-state (statement2 lis))
                                                                        stateList)))]
-      ;while
+      [(eq? (comand lis) 'while)  (if (M-boolean (condition lis))
+                                          (M-state lis (M-state (body lis) stateList))
+                                          (M-state (nextStatement lis) stateList))]
       [(eq? (comand lis) 'return) (M-state (statement lis) stateList)]
       [else 'placeholder]))) ;adjust this
 
@@ -58,11 +60,11 @@ while
     (cond
       [(not (declared? (leftoperand lis) stateList) (error 'Interpreter "Variable not declared. :("))]
       [(eq? (CheckBinding (leftoperand lis) stateList) 'null) (error 'Interpreter "Variable not initialized.")]
-      [else (ChangeBinding (leftoperand lis) (M-expression (rightOperand lis) stateList) stateList)])))
+      [else (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList) stateList)])))
        
 ;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
 (define M-expression ;returns number if math, boolean if not
-  (lambda (lis)
+  (lambda (lis stateList)
     (if (math? (operator lis)) ;checks if comand is a mathematical expression
         (M-integer lis stateList) 
         (M-boolean lis stateList)))) ;expressions can only be mathematical or boolean, might be a source of bugs (not checking if it is a boolean expression)
@@ -92,14 +94,14 @@ while
 (define AddBinding ;returns updated stateList
   (lambda (var stateList)
     (if (declared? var stateList)
-        (error 'Interpreter "Variable already declared."
-        (cons stateList (list (list var 'null))))))) ;abstract more? maybe?
+        (error 'Interpreter "Variable already declared.")
+        (cons stateList (list (list var 'null)))))) ;abstract more? maybe?
 
 ;CheckBinding takes a var name and statelist, then returns the value of the variable
 (define CheckBinding
   (lambda (var stateList)
     (cond
-      ((null? stateList) #f)
+      ((null? stateList) (error 'Interpreter "Variable has not been declared."))
       ((equal? (caar stateList) var) (cadar stateList))
       (else (CheckBinding var (cdr stateList))))))
     
@@ -132,10 +134,11 @@ while
 
 ;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
 (define M-boolean ;returns #t or #f
-  (lambda (lis)
+  (lambda (lis stateList)
     (cond
       [(eq? lis 'true) #t]
       [(eq? lis 'false) #f]
+      [(not (list? lis) (CheckBinding lis stateList))]
       [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis)) (M-boolean (rightoperand lis)))]
       [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis)) (M-boolean (rightoperand lis)))]
       [(eq? (operator lis) '!)  (not (M-boolean leftoperand lis))]
