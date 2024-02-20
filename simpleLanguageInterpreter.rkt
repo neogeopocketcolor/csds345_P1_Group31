@@ -23,7 +23,7 @@ while
 (define condition cadr)
 (define statement1 caddr)
 (define M-else caddr)
-(define statement2 (cadr (cddr)))
+(define statement2 (lambda (v) (cadr (cddr v))))
 
 (define operator car)
 (define leftoperand cadr)
@@ -37,12 +37,12 @@ while
       [(null? lis) stateList]
       [(eq? (comand lis) '=)      (M-state (nextStatement lis) (M-assign (statement lis) stateList))]
       [(eq? (comand lis) 'var)    (M-state (nextStatement lis) (M-declare (statement lis) stateList))]
-      [(eq? (comand lis) 'if)     (M-state (nextStatement lis) (if (M-boolean (condition lis))
+      [(eq? (comand lis) 'if)     (M-state (nextStatement lis) (if (M-boolean (condition lis) stateList)
                                                                    (M-state (statement1 lis))
                                                                    (if (not (null? (M-else lis)))
                                                                        (M-state (statement2 lis))
                                                                        stateList)))]
-      [(eq? (comand lis) 'while)  (if (M-boolean (condition lis))
+      [(eq? (comand lis) 'while)  (if (M-boolean (condition lis) stateList)
                                           (M-state lis (M-state (body lis) stateList))
                                           (M-state (nextStatement lis) stateList))]
       [(eq? (comand lis) 'return) (M-state (statement lis) stateList)]
@@ -120,15 +120,16 @@ while
 
 ;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
 (define M-integer ;returns a number
-  (lambda (lis)
+  (lambda (lis stateList)
     (cond
       [(number? lis) lis]
-      [(eq? (operator lis) '+) (+ (M-integer (leftoperand lis)) (M-integer (rightoperand lis)))]
-      [(and (eq? (operator lis) '-) (null? (rightoperand lis))) (- 0 (M-integer (leftoperand lis)))]
-      [(eq? (operator lis) '-) (- (M-integer (leftoperand lis)) (M-integer (rightoperand lis)))]
-      [(eq? (operator lis) '*) (* (M-integer (leftoperand lis)) (M-integer (rightoperand lis)))]
-      [(eq? (operator lis) '/) (quotient (M-integer (leftoperand lis)) (M-integer (rightoperand lis)))]
-      [(eq? (operator lis) '%) (remainder (M-integer (leftoperand lis)) (M-integer (rightoperand lis)))]
+      [(not (list? lis)) (CheckBinding lis stateList)]
+      [(eq? (operator lis) '+) (+ (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
+      [(and (eq? (operator lis) '-) (null? (rightoperand lis))) (- 0 (M-integer (leftoperand lis)) stateList)]
+      [(eq? (operator lis) '-) (- (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
+      [(eq? (operator lis) '*) (* (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
+      [(eq? (operator lis) '/) (quotient (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
+      [(eq? (operator lis) '%) (remainder (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
       [else (error 'Interpreter "M-integer_Error")])))
 
 
@@ -138,16 +139,16 @@ while
     (cond
       [(eq? lis 'true) #t]
       [(eq? lis 'false) #f]
-      [(not (list? lis) (CheckBinding lis stateList))]
-      [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis)) (M-boolean (rightoperand lis)))]
-      [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis)) (M-boolean (rightoperand lis)))]
-      [(eq? (operator lis) '!)  (not (M-boolean leftoperand lis))]
-      [(eq? (operator lis) '==) (eq? (M-expression (leftoperand lis)) (M-expression (rightoperand lis)))]
-      [(eq? (operator lis) '>)  (> (M-expression (leftoperand lis)) (M-expression (rightoperand lis)))]
-      [(eq? (operator lis) '<)  (< (M-expression (leftoperand lis)) (M-expression (rightoperand lis)))]
-      [(eq? (operator lis) '<=) (<= (M-expression (leftoperand lis)) (M-expression (rightoperand lis)))]
-      [(eq? (operator lis) '>=) (>= (M-expression (leftoperand lis)) (M-expression (rightoperand lis)))]
-      [(eq? (operator lis) '!=) (not (eq? (M-expression (leftoperand lis)) (M-expression (rightoperand lis))))]
+      [(not (list? lis)) (CheckBinding lis stateList)]
+      [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis) stateList) (M-boolean (rightoperand lis) stateList))]
+      [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis) stateList) (M-boolean (rightoperand lis) stateList))]
+      [(eq? (operator lis) '!)  (not (M-boolean leftoperand lis) stateList)]
+      [(eq? (operator lis) '==) (eq? (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
+      [(eq? (operator lis) '>)  (> (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
+      [(eq? (operator lis) '<)  (< (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
+      [(eq? (operator lis) '<=) (<= (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
+      [(eq? (operator lis) '>=) (>= (M-expression (leftoperand lis stateList)) (M-expression (rightoperand lis) stateList))]
+      [(eq? (operator lis) '!=) (not (eq? (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList)))]
       [else (error 'Interpreter "M-boolean_Error")])))
       
     
