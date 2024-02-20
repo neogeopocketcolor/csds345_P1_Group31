@@ -80,12 +80,13 @@ while
       [else #f])))
 
 ;declared? takes a var name and the stateList, returning #t if var name exists in statelist. ex: (declared? 'x ((x 3))) returns #t
-#|
+
 (define declared?
   (lambda (var stateList)
-    (
-|#
-
+    (cond
+      ((null? stateList) #f)
+      ((equal? (caar stateList) var) #t)
+      (else (declared? var (cdr stateList))))))
 
 ;AddBinding takes a var name and the statelist, creates a new binding with given var 
 (define AddBinding ;returns updated stateList
