@@ -2,9 +2,6 @@
 (require "simpleParser.rkt")
 
 
-
-
-
 #|
 
 To Do List:
@@ -18,10 +15,7 @@ while
 
 |#
 
-
-
-
-
+;Abstractions
 (define comand caar)
 (define statement car)
 (define nextStatement cdr)
@@ -30,6 +24,10 @@ while
 (define statement1 caddr)
 (define M-else caddr)
 (define statement2 (cadr (cddr)))
+
+(define operator car)
+(define leftoperand cadr)
+(define rightoperand caddr)
 
 
 ;returns stateList -- the state represented by a list
@@ -97,13 +95,24 @@ while
         (cons stateList (list (list var 'null))))))) ;abstract more? maybe?
 
 ;CheckBinding takes a var name and statelist, then returns the value of the variable
+(define CheckBinding
+  (lambda (var stateList)
+    (cond
+      ((null? stateList) #f)
+      ((equal? (caar stateList) var) (cadar stateList))
+      (else (CheckBinding var (cdr stateList))))))
+    
 
 ;ChangeBinding takes a var name, value, and stateList, then returns the stateList with the new variable value,
-
-
-(define operator car)
-(define leftoperand cadr)
-(define rightoperand caddr)
+;Probably needs the declared? variable check, + more abstraction
+(define ChangeBinding
+  (lambda (var newVal stateList)
+    (cond
+      ((null? stateList) stateList)
+      ((equal? (caar stateList) var) 
+       (cons (list var newVal) (cdr stateList)))
+      (else
+       (cons (car stateList) (ChangeBinding var newVal (cdr stateList)))))))
 
 
 ;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
