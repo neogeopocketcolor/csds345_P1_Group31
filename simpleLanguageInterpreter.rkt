@@ -19,9 +19,14 @@ Connect Parser to allow for file interpretation
 (define M-else caddr)
 (define statement2 (lambda (v) (cadr (cddr v))))
 
+(define variableDec caar)
+(define varValue cddr)
+
 (define operator car)
 (define leftoperand cadr)
 (define rightoperand caddr)
+
+(define returnVal cadr)
  
 ;interpret command
 (define interpret
@@ -48,7 +53,7 @@ Connect Parser to allow for file interpretation
 
 (define M-declare ;returns updated stateList
   (lambda (lis stateList)
-    (if (null? (cddr lis)) ;MORE ABSTRACTION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    (if (null? (varValue lis))
         (AddBinding (leftoperand lis) stateList) ;declare only
         (M-assign lis (AddBinding (leftoperand lis) stateList))))) ;declare and assign
       
@@ -56,7 +61,7 @@ Connect Parser to allow for file interpretation
 (define M-assign ;returns updated stateList
   (lambda (lis stateList)
     (cond
-      [(not (declared? (leftoperand lis) stateList) (error 'Interpreter "Variable not declared. :("))]
+      [(not (declared? (leftoperand lis) stateList)) (error 'Interpreter "Variable not declared. :(")]
       [(eq? (CheckBinding (leftoperand lis) stateList) 'null) (error 'Interpreter "Variable not initialized.")]
       [else (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList) stateList)])))
        
@@ -84,8 +89,8 @@ Connect Parser to allow for file interpretation
 (define declared?
   (lambda (var stateList)
     (cond
-      ((null? stateList) #f)
-      ((equal? (caar stateList) var) #t)
+      ((null?  stateList) #f)
+      ((equal? (variableDec stateList) var) #t)
       (else (declared? var (cdr stateList))))))
 
 ;AddBinding takes a var name and the statelist, creates a new binding with given var 
@@ -93,7 +98,8 @@ Connect Parser to allow for file interpretation
   (lambda (var stateList)
     (if (declared? var stateList)
         (error 'Interpreter "Variable already declared.")
-        (cons stateList (list (list var 'null)))))) ;abstract more? maybe?
+        (cons (list var 'null) stateList))))
+
 
 ;CheckBinding takes a var name and statelist, then returns the value of the variable
 (define CheckBinding
@@ -105,18 +111,16 @@ Connect Parser to allow for file interpretation
     
 
 ;ChangeBinding takes a var name, value, and stateList, then returns the stateList with the new variable value,
-;Probably needs the declared? variable check, + more abstraction
 (define ChangeBinding
   (lambda (var newVal stateList)
     (cond
       ((null? stateList) stateList)
-      ((equal? (caar stateList) var) 
+      ((equal? (variableDec stateList) var) 
        (cons (list var newVal) (cdr stateList)))
       (else
        (cons (car stateList) (ChangeBinding var newVal (cdr stateList)))))))
 
 
-;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
 (define M-integer ;returns a number
   (lambda (lis stateList)
     (cond
@@ -151,8 +155,6 @@ Connect Parser to allow for file interpretation
       
 
 ;return statement
-
-(define returnVal cadr)
 
 (define M-return
   (lambda (statement stateList)
