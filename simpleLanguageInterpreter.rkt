@@ -22,6 +22,7 @@ Connect Parser to allow for file interpretation
 (define operator car)
 (define leftoperand cadr)
 (define rightoperand caddr)
+ 
 
 
 ;returns stateList -- the state represented by a list
@@ -32,9 +33,9 @@ Connect Parser to allow for file interpretation
       [(eq? (comand lis) '=)      (M-state (nextStatement lis) (M-assign (statement lis) stateList))]
       [(eq? (comand lis) 'var)    (M-state (nextStatement lis) (M-declare (statement lis) stateList))]
       [(eq? (comand lis) 'if)     (M-state (nextStatement lis) (if (M-boolean (condition lis) stateList)
-                                                                   (M-state (statement1 lis))
+                                                                   (M-state (statement1 lis) stateList)
                                                                    (if (not (null? (M-else lis)))
-                                                                       (M-state (statement2 lis))
+                                                                       (M-state (statement2 lis) stateList)
                                                                        stateList)))]
       [(eq? (comand lis) 'while)  (if (M-boolean (condition lis) stateList)
                                           (M-state lis (M-state (body lis) stateList))
@@ -44,7 +45,7 @@ Connect Parser to allow for file interpretation
 
 (define M-declare ;returns updated stateList
   (lambda (lis stateList)
-    (if (null? (rightoperand lis))
+    (if (null? (cddr lis)) ;MORE ABSTRACTION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         (AddBinding (leftoperand lis) stateList) ;declare only
         (M-assign lis (AddBinding (leftoperand lis) stateList))))) ;declare and assign
       
@@ -119,7 +120,7 @@ Connect Parser to allow for file interpretation
       [(number? lis) lis]
       [(not (list? lis)) (CheckBinding lis stateList)]
       [(eq? (operator lis) '+) (+ (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
-      [(and (eq? (operator lis) '-) (null? (rightoperand lis))) (- 0 (M-integer (leftoperand lis)) stateList)]
+      [(and (eq? (operator lis) '-) (null? (cddr lis))) (- 0 (M-integer (leftoperand lis) stateList))] ;MORE ABSTRACTION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       [(eq? (operator lis) '-) (- (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
       [(eq? (operator lis) '*) (* (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
       [(eq? (operator lis) '/) (quotient (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
