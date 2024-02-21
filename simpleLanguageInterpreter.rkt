@@ -23,7 +23,10 @@ Connect Parser to allow for file interpretation
 (define leftoperand cadr)
 (define rightoperand caddr)
  
-
+;interpret command
+(define interpret
+  (lambda (filename)
+    (M-state (parser filename) '())))
 
 ;returns stateList -- the state represented by a list
 (define M-state ;returns stateList
@@ -163,10 +166,15 @@ Connect Parser to allow for file interpretation
       (else (error 'Interpreter statement)))))
 
 ;Testing code
+
+(interpret "testthis.txt") ;rename this to whatever you need
+
 (M-state '((return 150)) '((A 1) (B 2) (C 3)))
 (M-state '((return (- (/ (* 6 (+ 8 (% 5 3))) 11) 9))) '((A 1) (B 2) (C 3)))
 (M-state '((return C)) '((A 1) (B 2) (C 3)))
 (M-state '((return (* C B))) '((A 1) (B 2) (C 3)))
 (M-state '((var z) (= z 10) (return z)) '()) ;Broken
+
+
 
  
