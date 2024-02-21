@@ -5,13 +5,7 @@
 #|
 
 To Do List:
-add variable functionality to M-integer & M-boolean
-error checks (especially making sure variables are declared/initialized before use)
-CheckBinding
-ChangeBinding
-declared?
-while
-
+Connect Parser to allow for file interpretation
 
 |#
 
@@ -163,10 +157,15 @@ while
       ((number? (returnVal statement)) (returnVal statement))
       ((eq? #t (returnVal statement)) 'true)
       ((eq? #f (returnVal statement)) 'false)
-      ((eq? #t (declared? (returnVal statement) stateList)) (CheckBinding (returnVal statement) stateList)) ;check if statement is a declared variable, if so return the value.
-      (else (error 'Interpreter "sorry, doesn't exist.")))))
+      ((and (pair? (returnVal statement)) (math? (car (returnVal statement)))) (M-expression (returnVal statement) stateList)) ;if an expression, call m-expression
+      ((declared? (returnVal statement) stateList) (CheckBinding (returnVal statement) stateList)) ;check if statement is a declared variable, if so return the value.
+      (else (error 'Interpreter statement)))))
 
 ;Testing code
-;(M-state '((return B)) '((A 1) (B 2) (C 3)))
+(M-state '((return 150)) '((A 1) (B 2) (C 3)))
+(M-state '((return (- (/ (* 6 (+ 8 (% 5 3))) 11) 9))) '((A 1) (B 2) (C 3)))
+(M-state '((return C)) '((A 1) (B 2) (C 3)))
+(M-state '((return (* C B))) '((A 1) (B 2) (C 3)))
+(M-state '((var z) (= z 10) (return z)) '()) ;Broken
 
  
