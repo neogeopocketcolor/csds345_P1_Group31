@@ -5,9 +5,12 @@
 #|
 
 To Do List:
-
+add variable functionality to M-integer & M-boolean
 error checks (especially making sure variables are declared/initialized before use)
-return
+CheckBinding
+ChangeBinding
+declared?
+while
 
 
 |#
@@ -42,7 +45,7 @@ return
       [(eq? (comand lis) 'while)  (if (M-boolean (condition lis) stateList)
                                           (M-state lis (M-state (body lis) stateList))
                                           (M-state (nextStatement lis) stateList))]
-      [(eq? (comand lis) 'return) (M-state (statement lis) stateList)]
+      [(eq? (comand lis) 'return) (M-return (statement lis) stateList)]
       [else 'placeholder]))) ;adjust this
 
 (define M-declare ;returns updated stateList
@@ -59,18 +62,12 @@ return
       [(eq? (CheckBinding (leftoperand lis) stateList) 'null) (error 'Interpreter "Variable not initialized.")]
       [else (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList) stateList)])))
        
-;Doesn't work for a variable
+;Does this take vars?
 (define M-expression ;returns number if math, boolean if not
   (lambda (lis stateList)
-    (cond
-      [(declared? lis stateList) (if (math? (CheckBinding lis stateList))
-                             (M-integer lis stateList)
-                             (M-boolean lis stateList))]
-      [(not (list? lis)) (if (math? lis)
-                             (M-integer lis stateList)
-                             (M-boolean lis stateList))]
-      [(math? (operator lis)) (M-integer lis stateList)]
-      [else (M-boolean lis stateList)]))) ;expressions can only be mathematical or boolean, might be a source of bugs (not checking if it is a boolean expression)
+    (if (math? (operator lis)) ;checks if comand is a mathematical expression
+        (M-integer lis stateList) 
+        (M-boolean lis stateList)))) ;expressions can only be mathematical or boolean, might be a source of bugs (not checking if it is a boolean expression)
 
 ;tests if val is a number or math operator,  returning #t if it is, #f otherwise
 (define math?
@@ -121,7 +118,7 @@ return
        (cons (car stateList) (ChangeBinding var newVal (cdr stateList)))))))
 
 
-;Evaluates a mathematical expression
+;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
 (define M-integer ;returns a number
   (lambda (lis stateList)
     (cond
@@ -136,22 +133,40 @@ return
       [else (error 'Interpreter "M-integer_Error")])))
 
 
-;Evaluates a boolean expression
+;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
 (define M-boolean ;returns #t or #f
   (lambda (lis stateList)
     (cond
       [(eq? lis 'true) #t]
       [(eq? lis 'false) #f]
-      [(not (list? lis)) (M-boolean (CheckBinding lis stateList) stateList)]
+      [(not (list? lis)) (CheckBinding lis stateList)]
       [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis) stateList) (M-boolean (rightoperand lis) stateList))]
-      [(eq? (operator lis) '||) (or  (M-boolean (leftoperand lis) stateList) (M-boolean (rightoperand lis) stateList))]
-      [(eq? (operator lis) '!)  (not (M-boolean (leftoperand lis) stateList))]
+      [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis) stateList) (M-boolean (rightoperand lis) stateList))]
+      [(eq? (operator lis) '!)  (not (M-boolean leftoperand lis) stateList)]
       [(eq? (operator lis) '==) (eq? (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
-      [(eq? (operator lis) '>)  (>   (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
-      [(eq? (operator lis) '<)  (<   (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
-      [(eq? (operator lis) '<=) (<=  (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
-      [(eq? (operator lis) '>=) (>=  (M-expression (leftoperand lis stateList)) (M-expression (rightoperand lis) stateList))]
+      [(eq? (operator lis) '>)  (> (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
+      [(eq? (operator lis) '<)  (< (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
+      [(eq? (operator lis) '<=) (<= (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
+      [(eq? (operator lis) '>=) (>= (M-expression (leftoperand lis stateList)) (M-expression (rightoperand lis) stateList))]
       [(eq? (operator lis) '!=) (not (eq? (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList)))]
       [else (error 'Interpreter "M-boolean_Error")])))
       
-    
+
+;return statement
+
+(define returnVal cadr)
+
+(define M-return
+  (lambda (statement stateList)
+    (cond
+      ((null? statement) (error 'Interpreter "dude what"))
+      ((number? (returnVal statement)) (returnVal statement))
+      ((eq? #t (returnVal statement)) 'true)
+      ((eq? #f (returnVal statement)) 'false)
+      ((eq? #t (declared? (returnVal statement) stateList)) (CheckBinding (returnVal statement) stateList)) ;check if statement is a declared variable, if so return the value.
+      (else (error 'Interpreter "sorry, doesn't exist.")))))
+
+;Testing code
+;(M-state '((return B)) '((A 1) (B 2) (C 3)))
+
+ 
