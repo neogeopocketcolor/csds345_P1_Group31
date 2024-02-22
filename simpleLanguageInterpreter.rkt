@@ -9,7 +9,21 @@ ads206 - ajr250 - csl86
 CSDS 345
 Project 1 - Simple Language Interpreter
 
+
+
+
+##############################################
+
+To run, use the function (interpret "<filename>.txt").
+
+##############################################
+
+
+
+
+
 |#
+
 
 ;Abstractions
 (define command caar)
@@ -53,7 +67,7 @@ Project 1 - Simple Language Interpreter
                                           (M-state lis (M-state (body lis) stateList))
                                           (M-state (nextStatement lis) stateList))]
       [(eq? (command lis) 'return) (M-return (statement lis) stateList)]
-      [else (error 'Interpreter "Not a valid command")]))) 
+      [else                        (error 'Interpreter "Not a valid command")]))) 
 
 ;M-declare - declares a variable, either with or without a binding to a value.
 (define M-declare
@@ -65,20 +79,20 @@ Project 1 - Simple Language Interpreter
 ;M-assign - assigns a binding to a variable if the variable doesn't already have a value.
 (define M-assign 
   (lambda (lis stateList)
-    (if (not (declared? (leftoperand lis) stateList))
-        (error 'Interpreter "Variable not declared. :(")
-        (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList) stateList))))
+    (if (declared? (leftoperand lis) stateList)
+        (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList) stateList)
+        (error 'Interpreter "Variable not declared. :("))))
        
 ;M-expression - checks if an operation needs to return a number (math equation) or a boolean (t/f).
 (define M-expression
   (lambda (lis stateList)
     (cond
-      [(not (list? lis)) (if (math? lis)
-                             (M-integer lis stateList)
-                             (M-boolean lis stateList))]
+      [(not (list? lis))         (if (math? lis)
+                                     (M-integer lis stateList)
+                                     (M-boolean lis stateList))]
       [(declared? lis stateList) (M-expression (CheckBinding lis stateList) stateList)]
-      [(math? (operator lis)) (M-integer lis stateList)]
-      [else (M-boolean lis stateList)])))
+      [(math? (operator lis))    (M-integer lis stateList)]
+      [else                      (M-boolean lis stateList)])))
 
 ;math? - tests if val is a number or math operator, returning #t if it is, #f otherwise.
 (define math?
@@ -112,42 +126,40 @@ Project 1 - Simple Language Interpreter
 (define CheckBinding
   (lambda (var stateList)
     (cond
-      ((null? stateList) (error 'Interpreter "Variable has not been declared."))
+      ((null? stateList)             (error 'Interpreter "Variable has not been declared."))
       ((equal? (caar stateList) var) (cadar stateList))
-      (else (CheckBinding var (cdr stateList))))))
+      (else                          (CheckBinding var (cdr stateList))))))
     
 
 ;ChangeBinding - takes a var name, value, and stateList, then returns the stateList with the new variable's value updated.
 (define ChangeBinding
   (lambda (var newVal stateList)
     (cond
-      ((null? stateList) stateList)
-      ((equal? (variableDec stateList) var) 
-       (cons (list var newVal) (cdr stateList)))
-      (else
-       (cons (car stateList) (ChangeBinding var newVal (cdr stateList)))))))
+      ((null? stateList)                    stateList)
+      ((equal? (variableDec stateList) var) (cons (list var newVal) (cdr stateList)))
+      (else                                 (cons (car stateList) (ChangeBinding var newVal (cdr stateList)))))))
 
 ;M-integer - checks what kind of operation needs to be performed, returns an integer.
 (define M-integer
   (lambda (lis stateList)
     (cond
-      [(number? lis) lis]
-      [(not (list? lis)) (CheckBinding lis stateList)]
+      [(number? lis)           lis]
+      [(not (list? lis))       (CheckBinding lis stateList)]
       [(eq? (operator lis) '+) (+ (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
       [(and (eq? (operator lis) '-) (null? (value lis))) (- 0 (M-integer (leftoperand lis) stateList))]
       [(eq? (operator lis) '-) (- (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
       [(eq? (operator lis) '*) (* (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
       [(eq? (operator lis) '/) (quotient (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
       [(eq? (operator lis) '%) (remainder (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
-      [else (error 'Interpreter "M-integer_Error")])))
+      [else                    (error 'Interpreter "M-integer_Error")])))
 
 ;M-boolean - checks what kind of comparison must be made, returns either #t or #f.
 (define M-boolean
   (lambda (lis stateList)
     (cond
-      [(eq? lis 'true) #t]
-      [(eq? lis 'false) #f]
-      [(not (list? lis)) (CheckBinding lis stateList)]
+      [(eq? lis 'true)          #t]
+      [(eq? lis 'false)         #f]
+      [(not (list? lis))        (CheckBinding lis stateList)]
       [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis) stateList) (M-boolean (rightoperand lis) stateList))]
       [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis) stateList) (M-boolean (rightoperand lis) stateList))]
       [(eq? (operator lis) '!)  (not (M-boolean leftoperand lis) stateList)]
@@ -157,20 +169,20 @@ Project 1 - Simple Language Interpreter
       [(eq? (operator lis) '<=) (<= (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
       [(eq? (operator lis) '>=) (>= (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
       [(eq? (operator lis) '!=) (not (eq? (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList)))]
-      [else (error 'Interpreter "M-boolean_Error")])))
+      [else                     (error 'Interpreter "M-boolean_Error")])))
       
 
 ;M-return - prints out the requested return value. Makes sure that #t/#f becomes 'true and 'false as well.
 (define M-return
   (lambda (statement stateList)
     (cond
-      ((null? statement) (error 'Interpreter "dude what"))
-      ((number? (returnVal statement)) (returnVal statement))
-      ((eq? #t (returnVal statement)) 'true)
-      ((eq? #f (returnVal statement)) 'false)
-      ((pair? (returnVal statement)) (M-return (returnify (M-expression (returnVal statement) stateList)) stateList)) ;if an expression, call m-expression
+      ((null? (returnVal statement))               (error 'Interpreter "No return value specified"))
+      ((number? (returnVal statement))             (returnVal statement))
+      ((eq? #t (returnVal statement))              'true)
+      ((eq? #f (returnVal statement))              'false)
+      ((pair? (returnVal statement))               (M-return (returnify (M-expression (returnVal statement) stateList)) stateList)) ;if an expression, call m-expression
       ((declared? (returnVal statement) stateList) (M-return (returnify (CheckBinding (returnVal statement) stateList)) stateList)) ;check if statement is a declared variable, if so return the value.
-      (else (error 'Interpreter "M-return error")))))
+      (else                                        (error 'Interpreter "M-return error")))))
 
 ;END
 
