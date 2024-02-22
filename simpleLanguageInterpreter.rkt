@@ -13,20 +13,22 @@ Connect Parser to allow for file interpretation
 (define comand caar)
 (define statement car)
 (define nextStatement cdr)
-(define body caddr)
-(define condition cadr)
-(define statement1 caddr)
-(define M-else caddr)
-(define statement2 (lambda (v) (cadr (cddr v))))
+(define body cddar)
+(define condition cadar)
+(define statement1 (lambda (v) (list (caddar v))))
+(define M-else (lambda (v) (cdr (cddar v))))
+(define statement2 (lambda (v) (list (cadr (cddar v)))))
 
 (define variableDec caar)
-(define varValue cddr)
+(define varValue cadr)
+(define value cddr)
 
 (define operator car)
 (define leftoperand cadr)
 (define rightoperand caddr)
 
 (define returnVal cadr)
+(define returnify (lambda (v) (list 'return v)))
  
 ;interpret command
 (define interpret
@@ -53,24 +55,29 @@ Connect Parser to allow for file interpretation
 
 (define M-declare ;returns updated stateList
   (lambda (lis stateList)
-    (if (null? (varValue lis))
-        (AddBinding (leftoperand lis) stateList) ;declare only
-        (M-assign lis (AddBinding (leftoperand lis) stateList))))) ;declare and assign
+    (if (null? (value lis))
+        (AddBinding (varValue lis) stateList) ;declare only
+        (M-assign lis (AddBinding (varValue lis) stateList))))) ;declare and assign
+        
       
 
 (define M-assign ;returns updated stateList
   (lambda (lis stateList)
     (cond
       [(not (declared? (leftoperand lis) stateList)) (error 'Interpreter "Variable not declared. :(")]
-      [(eq? (CheckBinding (leftoperand lis) stateList) 'null) (error 'Interpreter "Variable not initialized.")]
+      ;[(eq? (CheckBinding (leftoperand lis) stateList) 'null) (error 'Interpreter "Variable not initialized.")]
       [else (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList) stateList)])))
        
-;Does this take vars?
+;
 (define M-expression ;returns number if math, boolean if not
   (lambda (lis stateList)
-    (if (math? (operator lis)) ;checks if comand is a mathematical expression
-        (M-integer lis stateList) 
-        (M-boolean lis stateList)))) ;expressions can only be mathematical or boolean, might be a source of bugs (not checking if it is a boolean expression)
+    (cond
+      [(not (list? lis)) (if (math? lis)
+                             (M-integer lis stateList)
+                             (M-boolean lis stateList))]
+      [(declared? lis stateList) (M-expression (CheckBinding lis stateList) stateList)]
+      [(math? (operator lis)) (M-integer lis stateList)]
+      [else (M-boolean lis stateList)]))) ;expressions can only be mathematical or boolean, might be a source of bugs (not checking if it is a boolean expression)
 
 ;tests if val is a number or math operator,  returning #t if it is, #f otherwise
 (define math?
@@ -127,15 +134,13 @@ Connect Parser to allow for file interpretation
       [(number? lis) lis]
       [(not (list? lis)) (CheckBinding lis stateList)]
       [(eq? (operator lis) '+) (+ (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
-      [(and (eq? (operator lis) '-) (null? (cddr lis))) (- 0 (M-integer (leftoperand lis) stateList))] ;MORE ABSTRACTION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      [(and (eq? (operator lis) '-) (null? (value lis))) (- 0 (M-integer (leftoperand lis) stateList))]
       [(eq? (operator lis) '-) (- (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
       [(eq? (operator lis) '*) (* (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
       [(eq? (operator lis) '/) (quotient (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
       [(eq? (operator lis) '%) (remainder (M-integer (leftoperand lis) stateList) (M-integer (rightoperand lis) stateList))]
       [else (error 'Interpreter "M-integer_Error")])))
 
-
-;NEEDS TO TAKE STATELIST, NEEDS TO BE ABLE TO USE VARS
 (define M-boolean ;returns #t or #f
   (lambda (lis stateList)
     (cond
@@ -149,7 +154,7 @@ Connect Parser to allow for file interpretation
       [(eq? (operator lis) '>)  (> (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
       [(eq? (operator lis) '<)  (< (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
       [(eq? (operator lis) '<=) (<= (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
-      [(eq? (operator lis) '>=) (>= (M-expression (leftoperand lis stateList)) (M-expression (rightoperand lis) stateList))]
+      [(eq? (operator lis) '>=) (>= (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
       [(eq? (operator lis) '!=) (not (eq? (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList)))]
       [else (error 'Interpreter "M-boolean_Error")])))
       
@@ -163,19 +168,19 @@ Connect Parser to allow for file interpretation
       ((number? (returnVal statement)) (returnVal statement))
       ((eq? #t (returnVal statement)) 'true)
       ((eq? #f (returnVal statement)) 'false)
-      ((and (pair? (returnVal statement)) (math? (car (returnVal statement)))) (M-expression (returnVal statement) stateList)) ;if an expression, call m-expression
-      ((declared? (returnVal statement) stateList) (CheckBinding (returnVal statement) stateList)) ;check if statement is a declared variable, if so return the value.
-      (else (error 'Interpreter statement)))))
+      ((pair? (returnVal statement)) (M-return (returnify (M-expression (returnVal statement) stateList)) stateList)) ;if an expression, call m-expression
+      ((declared? (returnVal statement) stateList) (M-return (returnify (CheckBinding (returnVal statement) stateList)) stateList)) ;check if statement is a declared variable, if so return the value.
+      (else (error 'Interpreter "M-return error")))))
 
 ;Testing code
 
-(interpret "testthis.txt") ;rename this to whatever you need
+(interpret "test.txt") ;rename this to whatever you need
 
-(M-state '((return 150)) '((A 1) (B 2) (C 3)))
-(M-state '((return (- (/ (* 6 (+ 8 (% 5 3))) 11) 9))) '((A 1) (B 2) (C 3)))
-(M-state '((return C)) '((A 1) (B 2) (C 3)))
-(M-state '((return (* C B))) '((A 1) (B 2) (C 3)))
-(M-state '((var z) (= z 10) (return z)) '()) ;Broken
+;(M-state '((return 150)) '((A 1) (B 2) (C 3)))
+;(M-state '((return (- (/ (* 6 (+ 8 (% 5 3))) 11) 9))) '((A 1) (B 2) (C 3)))
+;(M-state '((return C)) '((A 1) (B 2) (C 3)))
+;(M-state '((return (* C B))) '((A 1) (B 2) (C 3)))
+;(M-state '((var z) (= z 10) (return z)) '()) ;Broken
 
 
 
