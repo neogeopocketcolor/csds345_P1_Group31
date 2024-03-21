@@ -61,7 +61,7 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList next break) ;TODO: change all cases to take in / work with new parameters
     (cond
       [(null? lis) stateList]
-      [(eq? (command lis) '=)      (M-assign (statement lis) stateList (lambda (s) (M-state (nextStatement lis) s next break)))]
+      [(eq? (command lis) '=)      (M-assign (statement lis) stateList (lambda (s) (M-state (lambda s (nextStatement lis) s next break)))]
       [(eq? (command lis) 'var)    (M-declare (statement lis) stateList) (lambda (s) (M-state (nextStatement lis) s next break))]
       [(eq? (command lis) 'if)     (if (M-boolean (condition lis) stateList)
                                        (M-state (statement1 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break)) break)
@@ -71,10 +71,11 @@ Project 2 - Simple Language Interpreter
       [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (M-state (nextStatement lis) stateList) (lambda (s) (M-state (nextStatement lis) stateList)))]
       [(eq? (command lis) 'return) (M-return (statement lis) stateList)]
       [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (pop s))) (lambda (s) (next s)))] 
-      [(eq? (command lis) 'try) (M-state (beginBody lis) (push stateList) (finallyShortcut lis) (catchShortcut))]
-      [(eq? (command lis) 'catch) (error 'Interpreter "needs implementation")]
+      [(eq? (command lis) 'try) (M-state (beginBody lis) (push stateList) (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break) (lambda (v) v))
+                                                                            (lambda (s0) (M-state (catchShortcut lis) s0 (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break))) (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break)))))))]
+      [(eq? (command lis) 'catch) (]
       [(eq? (command lis) 'throw) (error 'Interpreter "needs implementation")]
-      [(eq? (command lis) 'finally) (error 'Interpreter "needs implementation")]
+      [(eq? (command lis) 'finally) (error 'Interpreter "needs implementation")] ;return popped state
       [(eq? (command lis) 'break) (break (pop stateList))]
       [(eq? (command lis) 'continue) (error 'Interpreter "needs implementation")] 
       [else (error 'Interpreter "Not a valid command")]))) 
