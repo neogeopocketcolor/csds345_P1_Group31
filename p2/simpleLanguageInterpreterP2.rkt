@@ -43,6 +43,11 @@ Project 2 - Simple Language Interpreter
 (define returnVal cadr)
 (define returnify (lambda (v) (list 'return v)))
 
+(define finallyShortcut
+  (lambda (v) car (cadr (cdr (cdr (car v))))))
+(define catchShortcut
+  (lambda (v) car (cadr (cdr (car v)))))
+
 (define pop cdr)
 (define push (lambda (v) (cons '() v)))
 
@@ -65,15 +70,9 @@ Project 2 - Simple Language Interpreter
                                            stateList))]
       [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (M-state (nextStatement lis) stateList) (lambda (s) (M-state (nextStatement lis) stateList)))]
       [(eq? (command lis) 'return) (M-return (statement lis) stateList)]
-      ;Placeholders for the new states
-      ;Begin - Maybe calls stateTreeStarter to make a new stateTree? In some way, this needs to call *something* that makes a new layer.
       [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (pop s))) (lambda (s) (next s)))] 
-      ;Try - same thing here, this needs to do something very similar to Begin (no shit sherlock)
-      [(eq? (command lis) 'try) (error 'Interpreter "needs implementation")]
-      ;Catch - barely any ideas for this one. Maybe something where if M-state catches a "try", then it first gets the (car (cdr cdr)) to know what the Catch is
-      ;And then from there a catch function defines how to throw the error. Speaking of,
+      [(eq? (command lis) 'try) (M-state (beginBody lis) (push stateList) (finallyShortcut lis) (catchShortcut))]
       [(eq? (command lis) 'catch) (error 'Interpreter "needs implementation")]
-      ;Throw - isn't this supposed to be a goto for throwing an *error*. Why do the examples have it as like. A pseudo-return or whatever. I wanna explode
       [(eq? (command lis) 'throw) (error 'Interpreter "needs implementation")]
       [(eq? (command lis) 'finally) (error 'Interpreter "needs implementation")]
       [(eq? (command lis) 'break) (break (pop stateList))]
