@@ -62,14 +62,14 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList next break throw) ;TODO: change all cases to take in / work with new parameters
     (cond
       [(null? lis) stateList]
-      [(eq? (command lis) '=)      (M-assign (statement lis) stateList (lambda (s) (M-state (lambda s (nextStatement lis) s next break)))]
-      [(eq? (command lis) 'var)    (M-declare (statement lis) stateList) (lambda (s) (M-state (nextStatement lis) s next break))]
+      [(eq? (command lis) '=)      (M-assign (statement lis) stateList (lambda (s) (M-state (lambda s (nextStatement lis) s next break throw))))]
+      [(eq? (command lis) 'var)    (M-declare (statement lis) stateList) (lambda (s) (M-state (nextStatement lis) s next break throw))]
       [(eq? (command lis) 'if)     (if (M-boolean (condition lis) stateList)
-                                       (M-state (statement1 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break)) break)
+                                       (M-state (statement1 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break throw)) break throw)
                                        (if (not (null? (M-else lis)))
-                                           (M-state (statement2 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break)) break)
+                                           (M-state (statement2 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break throw)) break throw)
                                            (next stateList)))] 
-      [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (M-state (nextStatement lis) stateList) (lambda (s) (M-state (nextStatement lis) stateList)))]
+      [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (M-state (nextStatement lis) stateList) (lambda (s) (M-state (nextStatement lis) stateList)) throw)]
       [(eq? (command lis) 'return) (M-return (statement lis) stateList)]
       [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (pop s))) (lambda (s) (next s)))] 
       [(eq? (command lis) 'try) (M-state (beginBody lis) (push stateList) (M-state (finallyShortcut lis) (lambda (s) M-state (nextStatement lis) s break throw)) ;next, go to finally
