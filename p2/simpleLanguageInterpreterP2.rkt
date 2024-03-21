@@ -20,6 +20,7 @@ Project 2 - Simple Language Interpreter
 (define statement1 (lambda (v) (list (caddar v))))
 (define M-else (lambda (v) (cdr (cddar v))))
 (define statement2 (lambda (v) (list (cadr (cddar v)))))
+(define beginBody cdar)
 
 (define variableDec caar)
 (define varValue cadr)
@@ -33,11 +34,12 @@ Project 2 - Simple Language Interpreter
 (define returnify (lambda (v) (list 'return v)))
 
 (define pop cdr)
+(define push (lambda (v) (cons '() v)))
 
 ;interpret command - required, parses the input file and executes the code.
 (define interpret
   (lambda (filename)
-    (stateTreeStarter (parser filename) '()))) ;maybe abstract the '()?
+    (stateTreeStarter (parser filename) '(())))) ;maybe abstract the '()?
 
 ;====NEW!====
 ;stateTreeStarter - extension of interpret, a (probably) botched use of call/cc to start the first state level
@@ -51,14 +53,7 @@ Project 2 - Simple Language Interpreter
 
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
-  (lambda (lis stateList return)
-    ;====================
-    ;HI LOOK HERE
-    ;I threw in a temporary "return" into M-state
-    ;That would be used in conjunction w/ the return made by stateTreeStarter.
-    ;Again this is just a temporary idea to get something down, I legit have no clue where to go from here
-    ;I want to die :33333
-    ;====================
+  (lambda (lis stateList next break) ;TODO: change all cases to take in / work with new parameters
     (cond
       [(null? lis) stateList]
       [(eq? (command lis) '=)      (M-state (nextStatement lis) (M-assign (statement lis) stateList) return)]
@@ -73,7 +68,7 @@ Project 2 - Simple Language Interpreter
       [(eq? (command lis) 'return) (M-return (statement lis) stateList)]
       ;Placeholders for the new states
       ;Begin - Maybe calls stateTreeStarter to make a new stateTree? In some way, this needs to call *something* that makes a new layer.
-      [(eq? (command lis) 'begin) (error 'Interpreter "needs implementation")]
+      [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (pop s))) (lambda (s) (next s)))] 
       ;Try - same thing here, this needs to do something very similar to Begin (no shit sherlock)
       [(eq? (command lis) 'try) (error 'Interpreter "needs implementation")]
       ;Catch - barely any ideas for this one. Maybe something where if M-state catches a "try", then it first gets the (car (cdr cdr)) to know what the Catch is
@@ -153,22 +148,37 @@ Project 2 - Simple Language Interpreter
 ;AddBinding - takes a var name and the statelist, creates a new binding with given var.
 (define AddBinding
   (lambda (var stateList)
-    (if (declared? var stateList)
+    (if (declared? var (car stateList))
         (error 'Interpreter "Variable already declared.")
-        (cons (list var 'null) stateList))))
+        (cons (list var 'null) (car stateList)))))
 
 
-;CheckBinding - takes a var name and statelist, then returns the value of the variable.
+;CheckBinding - takes a var name and statelist, then returns the value of the variable. returns the first instance of said variable
 (define CheckBinding
+  (lambda (var bigStateList)
+    (cond
+      ((null? bigStateList) (error 'Interpreter "Variable has not been declared."))
+      ((equal? (car (CheckBindingInside var (car bigStateList))) var) (cadr (CheckBindingInside var (car (bigStateList)))))
+      (else (CheckBinding var (cdr bigStateList))))))
+
+;takes a sub-stateList, and returns the binding of a corresponding variable if it exists. (var varValue)
+(define CheckBindingInside
   (lambda (var stateList)
     (cond
-      ((null? stateList) (error 'Interpreter "Variable has not been declared."))
-      ((equal? (caar stateList) var) (cadar stateList))
+      ((null? stateList) '())
+      ((equal? (caar stateList) var) (car stateList))
       (else (CheckBinding var (cdr stateList))))))
     
 
 ;ChangeBinding - takes a var name, value, and stateList, then returns the stateList with the new variable's value updated.
 (define ChangeBinding
+  (lambda (var newVal bigStateList)
+    (cond
+      [(null? bigStateList) (error `Interpreter "Variable has not been declared.")]
+      [(declared? (car bigStateList))(cons (ChangeBindingInside var newVal (car bigStateList)) (cdr bigStateList))]
+      [else (cons (car bigStateList) (ChangeBinding var newVal (cdr bigStateList)))])))
+
+(define ChangeBindingInside
   (lambda (var newVal stateList)
     (cond
       ((null? stateList) stateList)
