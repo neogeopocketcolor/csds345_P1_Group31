@@ -31,9 +31,7 @@ Project 2 - Simple Language Interpreter
 
 (define returnVal cadr)
 (define returnify (lambda (v) (list 'return v)))
-
-(define pop cdr)
-
+ 
 ;interpret command - required, parses the input file and executes the code.
 (define interpret
   (lambda (filename)
@@ -69,7 +67,9 @@ Project 2 - Simple Language Interpreter
                                                                        (M-state (statement2 lis) stateList)
                                                                        stateList))
                                             return)]
-      [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (M-state (nextStatement lis) stateList) (lambda (s) (M-state (nextStatement lis) stateList)))]
+      [(eq? (command lis) 'while)  (if (M-boolean (condition lis) stateList)
+                                          (M-state lis (M-state (body lis) stateList return) return)
+                                          (M-state (nextStatement lis) stateList return))]
       [(eq? (command lis) 'return) (M-return (statement lis) stateList)]
       ;Placeholders for the new states
       ;Begin - Maybe calls stateTreeStarter to make a new stateTree? In some way, this needs to call *something* that makes a new layer.
@@ -82,28 +82,9 @@ Project 2 - Simple Language Interpreter
       ;Throw - isn't this supposed to be a goto for throwing an *error*. Why do the examples have it as like. A pseudo-return or whatever. I wanna explode
       [(eq? (command lis) 'throw) (error 'Interpreter "needs implementation")]
       [(eq? (command lis) 'finally) (error 'Interpreter "needs implementation")]
-      [(eq? (command lis) 'break) (break (pop stateList))]
+      [(eq? (command lis) 'break) (error 'Interpreter "needs implementation")]
       [(eq? (command lis) 'continue) (error 'Interpreter "needs implementation")] 
       [else (error 'Interpreter "Not a valid command")]))) 
-
-;Helper function for loops
-(define loop
-  (lambda (condition body stateList next break)
-    (if (M-boolean condition stateList)
-        (M-state body stateList (lambda (s) (loop condition body s next break)) break)
-        (next stateList))))
-
-
-
-
-
-
-
-
-
-
-
-
 
 ;M-declare - declares a variable, either with or without a binding to a value.
 (define M-declare
