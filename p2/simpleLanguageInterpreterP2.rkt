@@ -28,7 +28,7 @@ Project 2 - Simple Language Interpreter
 (define initialBreak (lambda (v) v))
 (define initialThrow (lambda (v) v))
 
-(define variableDec caar)
+(define variableDec car)
 (define varValue cadr)
 (define value cddr)
 
@@ -98,12 +98,12 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList next)
     (if (null? (value lis))
         (AddBinding (varValue lis) (next stateList)) ;declare only
-        (next (M-assign lis (AddBinding (varValue lis) stateList) next))))) ;declare and assign
+        (next (M-assign (cdr lis) (AddBinding (varValue lis) stateList) next))))) ;declare and assign
         
 ;M-assign - assigns a binding to a variable if the variable doesn't already have a value.
 (define M-assign 
   (lambda (lis stateList next)
-    (if (not (declared? (leftoperand lis) (next stateList)))
+    (if (not (declared? (leftoperand lis) stateList))
         (error 'Interpreter "Variable not declared. :(")
         (next (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList) stateList)))))
        
