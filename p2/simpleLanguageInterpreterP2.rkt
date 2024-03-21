@@ -51,6 +51,7 @@ Project 2 - Simple Language Interpreter
 (define pop cdr)
 (define push (lambda (v) (cons '() v)))
 
+
 ;interpret command - required, parses the input file and executes the code.
 (define interpret
   (lambda (filename)
@@ -58,7 +59,7 @@ Project 2 - Simple Language Interpreter
 
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
-  (lambda (lis stateList next break) ;TODO: change all cases to take in / work with new parameters
+  (lambda (lis stateList next break throw) ;TODO: change all cases to take in / work with new parameters
     (cond
       [(null? lis) stateList]
       [(eq? (command lis) '=)      (M-assign (statement lis) stateList (lambda (s) (M-state (lambda s (nextStatement lis) s next break)))]
@@ -67,17 +68,20 @@ Project 2 - Simple Language Interpreter
                                        (M-state (statement1 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break)) break)
                                        (if (not (null? (M-else lis)))
                                            (M-state (statement2 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break)) break)
-                                           stateList))]
+                                           (next stateList)))] 
       [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (M-state (nextStatement lis) stateList) (lambda (s) (M-state (nextStatement lis) stateList)))]
       [(eq? (command lis) 'return) (M-return (statement lis) stateList)]
       [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (pop s))) (lambda (s) (next s)))] 
-      [(eq? (command lis) 'try) (M-state (beginBody lis) (push stateList) (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break) (lambda (v) v))
-                                                                            (lambda (s0) (M-state (catchShortcut lis) s0 (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break))) (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break)))))))]
-      [(eq? (command lis) 'catch) (]
-      [(eq? (command lis) 'throw) (error 'Interpreter "needs implementation")]
-      [(eq? (command lis) 'finally) (error 'Interpreter "needs implementation")] ;return popped state
+      [(eq? (command lis) 'try) (M-state (beginBody lis) (push stateList) (M-state (finallyShortcut lis) (lambda (s) M-state (nextStatement lis) s break throw)) ;next, go to finally
+                                                                            (M-state (finallyShortcut lis) stateList (lambda (s) M-state (nextStatement lis) s break throw)) ;if broken, go to finally
+                                                                              (M-state (catchShortcut lis) stateList ;if exception is thrown, go to catch
+                                                                                       (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break)));catch's next statement is finally
+                                                                                       (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break)))))] ;catch's break statement is finally
+      [(eq? (command lis) 'catch) (M-state (beginBody lis) stateList (lambda (s) (next s)) (lambda (s) (next s)) throw)]
+      [(eq? (command lis) 'throw) (throw stateList)]
+      [(eq? (command lis) 'finally) (M-state (beginBody lis) stateList (lambda (s) (next (pop s))) (lambda (s) (next (pop s))) throw)] ;return popped state
       [(eq? (command lis) 'break) (break (pop stateList))]
-      [(eq? (command lis) 'continue) (error 'Interpreter "needs implementation")] 
+      [(eq? (command lis) 'continue) (next stateList)] 
       [else (error 'Interpreter "Not a valid command")]))) 
 
 ;Helper function for loops
