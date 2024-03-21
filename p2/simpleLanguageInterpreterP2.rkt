@@ -41,16 +41,6 @@ Project 2 - Simple Language Interpreter
   (lambda (filename)
     (M-state (parser filename) '(()) (lambda (v) v) (lambda (v) v)))) ;maybe abstract the '()?
 
-;====NEW!====
-;stateTreeStarter - extension of interpret, a (probably) botched use of call/cc to start the first state level
-(define stateTreeStarter
-  (lambda (lis stateList)
-    (call/cc
-     (lambda (return)
-       (cond
-         ((null? lis) stateList)
-         (else (stateTreeStarter (cdr lis) (M-state lis stateList return))))))))
-
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
   (lambda (lis stateList next break) ;TODO: change all cases to take in / work with new parameters
