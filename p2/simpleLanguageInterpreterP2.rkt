@@ -21,6 +21,11 @@ Project 2 - Simple Language Interpreter
 (define M-else (lambda (v) (cdr (cddar v))))
 (define statement2 (lambda (v) (list (cadr (cddar v)))))
 (define beginBody cdar)
+(define emptyReturn `())
+
+(define initialState '(()))
+(define initialNext (lambda (v) v))
+(define initialBreak (lambda (v) v))
 
 (define variableDec caar)
 (define varValue cadr)
@@ -29,6 +34,11 @@ Project 2 - Simple Language Interpreter
 (define operator car)
 (define leftoperand cadr)
 (define rightoperand caddr)
+
+(define frontState car)
+(define followingStates cdr)
+(define innerFollowingStates cadr)
+(define innerState caar)
 
 (define returnVal cadr)
 (define returnify (lambda (v) (list 'return v)))
@@ -39,7 +49,7 @@ Project 2 - Simple Language Interpreter
 ;interpret command - required, parses the input file and executes the code.
 (define interpret
   (lambda (filename)
-    (M-state (parser filename) '(()) (lambda (v) v) (lambda (v) v)))) ;maybe abstract the '()?
+    (M-state (parser filename) initialState initialNext initialBreak)))
 
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
@@ -52,7 +62,7 @@ Project 2 - Simple Language Interpreter
                                        (M-state (statement1 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break)) break)
                                        (if (not (null? (M-else lis)))
                                            (M-state (statement2 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break)) break)
-                                           stateList)))]
+                                           stateList))]
       [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (M-state (nextStatement lis) stateList) (lambda (s) (M-state (nextStatement lis) stateList)))]
       [(eq? (command lis) 'return) (M-return (statement lis) stateList)]
       ;Placeholders for the new states
@@ -78,20 +88,9 @@ Project 2 - Simple Language Interpreter
         (next stateList))))
 
 
-
-
-
-
-
-
-
-
-
-
-
 ;M-declare - declares a variable, either with or without a binding to a value.
 (define M-declare
-  (lambda (lis stateList)
+  (lambda (lis stateList next)
     (if (null? (value lis))
         (AddBinding (varValue lis) (next stateList)) ;declare only
         (next (M-assign lis (AddBinding (varValue lis) stateList)))))) ;declare and assign
@@ -132,14 +131,14 @@ Project 2 - Simple Language Interpreter
     (cond
       ((null?  stateList) #f)
       ((equal? (variableDec stateList) var) #t)
-      (else (declared? var (cdr stateList))))))
+      (else (declared? var (followingStates stateList))))))
 
 ;AddBinding - takes a var name and the statelist, creates a new binding with given var.
 (define AddBinding
   (lambda (var stateList)
-    (if (declared? var (car stateList))
+    (if (declared? var (frontState stateList))
         (error 'Interpreter "Variable already declared.")
-        (cons (list var 'null) (car stateList)))))
+        (cons (list var 'null) (frontState stateList)))))
 
 
 ;CheckBinding - takes a var name and statelist, then returns the value of the variable. returns the first instance of said variable
@@ -147,34 +146,34 @@ Project 2 - Simple Language Interpreter
   (lambda (var bigStateList)
     (cond
       ((null? bigStateList) (error 'Interpreter "Variable has not been declared."))
-      ((equal? (car (CheckBindingInside var (car bigStateList))) var) (cadr (CheckBindingInside var (car (bigStateList)))))
-      (else (CheckBinding var (cdr bigStateList))))))
+      ((equal? (frontState (CheckBindingInside var (frontState bigStateList))) var) (innerFollowingStates (CheckBindingInside var (frontState (bigStateList)))))
+      (else (CheckBinding var (followingStates bigStateList))))))
 
 ;takes a sub-stateList, and returns the binding of a corresponding variable if it exists. (var varValue)
 (define CheckBindingInside
   (lambda (var stateList)
     (cond
-      ((null? stateList) '())
-      ((equal? (caar stateList) var) (car stateList))
-      (else (CheckBinding var (cdr stateList))))))
-    
+      ((null? stateList) emptyReturn)
+      ((equal? (innerState stateList) var) (frontState stateList))
+      (else (CheckBinding var (followingStates stateList))))))
+
 
 ;ChangeBinding - takes a var name, value, and stateList, then returns the stateList with the new variable's value updated.
 (define ChangeBinding
   (lambda (var newVal bigStateList)
     (cond
       [(null? bigStateList) (error `Interpreter "Variable has not been declared.")]
-      [(declared? (car bigStateList))(cons (ChangeBindingInside var newVal (car bigStateList)) (cdr bigStateList))]
-      [else (cons (car bigStateList) (ChangeBinding var newVal (cdr bigStateList)))])))
+      [(declared? (frontState bigStateList))(cons (ChangeBindingInside var newVal (frontState bigStateList)) (followingStates bigStateList))]
+      [else (cons (frontState bigStateList) (ChangeBinding var newVal (followingStates bigStateList)))])))
 
 (define ChangeBindingInside
   (lambda (var newVal stateList)
     (cond
       ((null? stateList) stateList)
       ((equal? (variableDec stateList) var) 
-       (cons (list var newVal) (cdr stateList)))
+       (cons (list var newVal) (followingStates stateList)))
       (else
-       (cons (car stateList) (ChangeBinding var newVal (cdr stateList)))))))
+       (cons (frontState stateList) (ChangeBinding var newVal (followingStates stateList)))))))
 
 ;M-integer - checks what kind of operation needs to be performed, returns an integer.
 (define M-integer
@@ -213,13 +212,13 @@ Project 2 - Simple Language Interpreter
 (define M-return
   (lambda (statement stateList)
     (cond
-      ((null? statement) (error 'Interpreter "dude what"))
+      ((null? statement) (error 'Interpreter "M-return error - Null statement somehow"))
       ((number? (returnVal statement)) (returnVal statement))
       ((eq? #t (returnVal statement)) 'true)
       ((eq? #f (returnVal statement)) 'false)
       ((pair? (returnVal statement)) (M-return (returnify (M-expression (returnVal statement) stateList)) stateList)) ;if an expression, call m-expression
       ((declared? (returnVal statement) stateList) (M-return (returnify (CheckBinding (returnVal statement) stateList)) stateList)) ;check if statement is a declared variable, if so return the value.
-      (else (error 'Interpreter "M-return error")))))
+      (else (error 'Interpreter "M-return error - Not accounted for")))))
 
 ;END
 
