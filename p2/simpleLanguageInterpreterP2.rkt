@@ -39,7 +39,7 @@ Project 2 - Simple Language Interpreter
 ;interpret command - required, parses the input file and executes the code.
 (define interpret
   (lambda (filename)
-    (stateTreeStarter (parser filename) '(())))) ;maybe abstract the '()?
+    (M-state (parser filename) '(()) (lambda (v) v) (lambda (v) v)))) ;maybe abstract the '()?
 
 ;====NEW!====
 ;stateTreeStarter - extension of interpret, a (probably) botched use of call/cc to start the first state level
@@ -56,14 +56,13 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList next break) ;TODO: change all cases to take in / work with new parameters
     (cond
       [(null? lis) stateList]
-      [(eq? (command lis) '=)      (M-state (nextStatement lis) (M-assign (statement lis) stateList) return)]
-      [(eq? (command lis) 'var)    (M-state (nextStatement lis) (M-declare (statement lis) stateList) return)]
-      [(eq? (command lis) 'if)     (M-state (nextStatement lis) (if (M-boolean (condition lis) stateList)
-                                                                   (M-state (statement1 lis) stateList)
-                                                                   (if (not (null? (M-else lis)))
-                                                                       (M-state (statement2 lis) stateList)
-                                                                       stateList))
-                                            return)]
+      [(eq? (command lis) '=)      (M-assign (statement lis) stateList (lambda (s) (M-state (nextStatement lis) s next break)))]
+      [(eq? (command lis) 'var)    (M-declare (statement lis) stateList) (lambda (s) (M-state (nextStatement lis) s next break))]
+      [(eq? (command lis) 'if)     (if (M-boolean (condition lis) stateList)
+                                       (M-state (statement1 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break)) break)
+                                       (if (not (null? (M-else lis)))
+                                           (M-state (statement2 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break)) break)
+                                           stateList)))]
       [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (M-state (nextStatement lis) stateList) (lambda (s) (M-state (nextStatement lis) stateList)))]
       [(eq? (command lis) 'return) (M-return (statement lis) stateList)]
       ;Placeholders for the new states
@@ -104,15 +103,15 @@ Project 2 - Simple Language Interpreter
 (define M-declare
   (lambda (lis stateList)
     (if (null? (value lis))
-        (AddBinding (varValue lis) stateList) ;declare only
-        (M-assign lis (AddBinding (varValue lis) stateList))))) ;declare and assign
+        (AddBinding (varValue lis) (next stateList)) ;declare only
+        (next (M-assign lis (AddBinding (varValue lis) stateList)))))) ;declare and assign
         
 ;M-assign - assigns a binding to a variable if the variable doesn't already have a value.
 (define M-assign 
-  (lambda (lis stateList)
-    (if (not (declared? (leftoperand lis) stateList))
+  (lambda (lis stateList next)
+    (if (not (declared? (leftoperand lis) (next stateList)))
         (error 'Interpreter "Variable not declared. :(")
-        (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList) stateList))))
+        (next (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList) stateList)))))
        
 ;M-expression - checks if an operation needs to return a number (math equation) or a boolean (t/f).
 (define M-expression
