@@ -132,11 +132,18 @@ Project 2 - Simple Language Interpreter
 
 ;declared? - takes a var name and the stateList, returning #t if var name exists in statelist. ex: (declared? 'x ((x 3))) returns #t.
 (define declared?
+  (lambda (var bigStateList)
+    (cond
+      ((null? bigStateList) #f)
+      ((declaredInside? var (car bigStateList)) #t)
+      (else (declared? var (cdr bigStateList))))))
+
+(define declaredInside?
   (lambda (var stateList)
     (cond
       ((null?  stateList) #f)
       ((equal? (variableDec stateList) var) #t)
-      (else (declared? var (followingStates stateList))))))
+      (else (declared? var (cdr stateList))))))
 
 ;AddBinding - takes a var name and the statelist, creates a new binding with given var.
 (define AddBinding
