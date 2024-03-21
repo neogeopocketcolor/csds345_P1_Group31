@@ -26,6 +26,7 @@ Project 2 - Simple Language Interpreter
 (define initialState '(()))
 (define initialNext (lambda (v) v))
 (define initialBreak (lambda (v) v))
+(define initialThrow (lambda (v) v))
 
 (define variableDec caar)
 (define varValue cadr)
@@ -55,7 +56,7 @@ Project 2 - Simple Language Interpreter
 ;interpret command - required, parses the input file and executes the code.
 (define interpret
   (lambda (filename)
-    (M-state (parser filename) initialState initialNext initialBreak)))
+    (M-state (parser filename) initialState initialNext initialBreak initialThrow)))
 
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
@@ -63,7 +64,7 @@ Project 2 - Simple Language Interpreter
     (cond
       [(null? lis) stateList]
       [(eq? (command lis) '=)      (M-assign (statement lis) stateList (lambda (s) (M-state (lambda s (nextStatement lis) s next break throw))))]
-      [(eq? (command lis) 'var)    (M-declare (statement lis) stateList) (lambda (s) (M-state (nextStatement lis) s next break throw))]
+      [(eq? (command lis) 'var)    (M-declare (statement lis) stateList next) (lambda (s) (M-state (nextStatement lis) s next break throw))]
       [(eq? (command lis) 'if)     (if (M-boolean (condition lis) stateList)
                                        (M-state (statement1 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break throw)) break throw)
                                        (if (not (null? (M-else lis)))
@@ -97,7 +98,7 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList next)
     (if (null? (value lis))
         (AddBinding (varValue lis) (next stateList)) ;declare only
-        (next (M-assign lis (AddBinding (varValue lis) stateList)))))) ;declare and assign
+        (next (M-assign lis (AddBinding (varValue lis) stateList) next))))) ;declare and assign
         
 ;M-assign - assigns a binding to a variable if the variable doesn't already have a value.
 (define M-assign 
@@ -167,7 +168,7 @@ Project 2 - Simple Language Interpreter
   (lambda (var newVal bigStateList)
     (cond
       [(null? bigStateList) (error `Interpreter "Variable has not been declared.")]
-      [(declared? (frontState bigStateList))(cons (ChangeBindingInside var newVal (frontState bigStateList)) (followingStates bigStateList))]
+      [(declared? var (frontState bigStateList))(cons (ChangeBindingInside var newVal (frontState bigStateList)) (followingStates bigStateList))]
       [else (cons (frontState bigStateList) (ChangeBinding var newVal (followingStates bigStateList)))])))
 
 (define ChangeBindingInside
@@ -223,6 +224,9 @@ Project 2 - Simple Language Interpreter
       ((pair? (returnVal statement)) (M-return (returnify (M-expression (returnVal statement) stateList)) stateList)) ;if an expression, call m-expression
       ((declared? (returnVal statement) stateList) (M-return (returnify (CheckBinding (returnVal statement) stateList)) stateList)) ;check if statement is a declared variable, if so return the value.
       (else (error 'Interpreter "M-return error - Not accounted for")))))
+
+;Test Statements
+(interpret "testthis.txt")
 
 ;END
 
