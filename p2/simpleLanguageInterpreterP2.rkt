@@ -63,13 +63,13 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList next break throw) ;TODO: change all cases to take in / work with new parameters
     (cond
       [(null? lis) stateList]
-      [(eq? (command lis) '=)      (M-assign (statement lis) stateList (lambda (s) (M-state (lambda s (nextStatement lis) s next break throw))))]
-      [(eq? (command lis) 'var)    (M-declare (statement lis) stateList next) (lambda (s) (M-state (nextStatement lis) s next break throw))]
+      [(eq? (command lis) '=)      (M-assign (statement lis) stateList (lambda (s) (next (M-state (lambda s (nextStatement lis) s next break throw)))))]
+      [(eq? (command lis) 'var)    (M-declare (statement lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw))))]
       [(eq? (command lis) 'if)     (if (M-boolean (condition lis) stateList)
-                                       (M-state (statement1 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break throw)) break throw)
+                                       (M-state (statement1 lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw)) break throw))
                                        (if (not (null? (M-else lis)))
-                                           (M-state (statement2 lis) stateList (lambda (s) (M-state (nextStatement lis) s next break throw)) break throw)
-                                           (next stateList)))] 
+                                           (M-state (statement2 lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw))) break throw)
+                                           (next (M-state (nextStatement lis) stateList next break throw))))] 
       [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (M-state (nextStatement lis) stateList) (lambda (s) (M-state (nextStatement lis) stateList)) throw)]
       [(eq? (command lis) 'return) (M-return (statement lis) stateList)]
       [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (pop s))) (lambda (s) (next s)))] 
@@ -97,8 +97,8 @@ Project 2 - Simple Language Interpreter
 (define M-declare
   (lambda (lis stateList next)
     (if (null? (value lis))
-        (AddBinding (varValue lis) (next stateList)) ;declare only
-        (next (M-assign (cdr lis) (AddBinding (varValue lis) stateList) next))))) ;declare and assign
+        (next (AddBinding (varValue lis) stateList)) ;declare only
+        (next (M-assign lis (AddBinding (varValue lis) stateList) next))))) ;declare and assign
         
 ;M-assign - assigns a binding to a variable if the variable doesn't already have a value.
 (define M-assign 
@@ -143,7 +143,7 @@ Project 2 - Simple Language Interpreter
     (cond
       ((null?  stateList) #f)
       ((equal? (variableDec stateList) var) #t)
-      (else (declared? var (cdr stateList))))))
+      (else (declaredInside? var (cdr stateList))))))
 
 ;AddBinding - takes a var name and the statelist, creates a new binding with given var.
 (define AddBinding
@@ -175,7 +175,7 @@ Project 2 - Simple Language Interpreter
   (lambda (var newVal bigStateList)
     (cond
       [(null? bigStateList) (error `Interpreter "Variable has not been declared.")]
-      [(declared? var (frontState bigStateList))(cons (ChangeBindingInside var newVal (frontState bigStateList)) (followingStates bigStateList))]
+      [(declaredInside? var (frontState bigStateList))(cons (ChangeBindingInside var newVal (frontState bigStateList)) (followingStates bigStateList))]
       [else (cons (frontState bigStateList) (ChangeBinding var newVal (followingStates bigStateList)))])))
 
 (define ChangeBindingInside
