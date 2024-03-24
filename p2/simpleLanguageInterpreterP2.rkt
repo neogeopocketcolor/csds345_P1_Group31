@@ -3,7 +3,7 @@
 
 #|
 
-Alex Seidman - Avry Rechel - Shea Leech
+Alex Seidman - Avry Rechel
 ads206 - ajr250 - csl86
 3/22/2024
 CSDS 345
@@ -21,14 +21,14 @@ Project 2 - Simple Language Interpreter
 (define M-else (lambda (v) (cdr (cddar v))))
 (define statement2 (lambda (v) (list (cadr (cddar v)))))
 (define beginBody cdar)
-(define emptyReturn `())
+(define emptyReturn '(()))
 
 (define initialState '(()))
 (define initialNext (lambda (v) v))
 (define initialBreak (lambda (v) v))
 (define initialThrow (lambda (v) v))
 
-(define variableDec car)
+(define variableDec caar)
 (define varValue cadr)
 (define value cddr)
 
@@ -56,40 +56,42 @@ Project 2 - Simple Language Interpreter
 ;interpret command - required, parses the input file and executes the code.
 (define interpret
   (lambda (filename)
-    (M-state (parser filename) initialState initialNext initialBreak initialThrow)))
+    (call/cc
+     (lambda (initialReturn)
+       (M-state (parser filename) initialState initialNext initialBreak initialThrow initialReturn)))))
 
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
-  (lambda (lis stateList next break throw) ;TODO: change all cases to take in / work with new parameters
+  (lambda (lis stateList next break throw return) ;TODO: change all cases to take in / work with new parameters
     (cond
       [(null? lis) stateList]
-      [(eq? (command lis) '=)      (M-assign (statement lis) stateList (lambda (s) (next (M-state (lambda s (nextStatement lis) s next break throw)))))]
-      [(eq? (command lis) 'var)    (M-declare (statement lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw))))]
+      [(eq? (command lis) '=)      (M-assign (statement lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))))]
+      [(eq? (command lis) 'var)    (M-declare (statement lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))))]
       [(eq? (command lis) 'if)     (if (M-boolean (condition lis) stateList)
-                                       (M-state (statement1 lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw)) break throw))
+                                       (M-state (statement1 lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return)) break throw return))
                                        (if (not (null? (M-else lis)))
                                            (M-state (statement2 lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw))) break throw)
-                                           (next (M-state (nextStatement lis) stateList next break throw))))] 
-      [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (M-state (nextStatement lis) stateList) (lambda (s) (M-state (nextStatement lis) stateList)) throw)]
-      [(eq? (command lis) 'return) (M-return (statement lis) stateList)]
-      [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (pop s))) (lambda (s) (next s)))] 
-      [(eq? (command lis) 'try) (M-state (beginBody lis) (push stateList) (M-state (finallyShortcut lis) (lambda (s) M-state (nextStatement lis) s break throw)) ;next, go to finally
-                                                                            (M-state (finallyShortcut lis) stateList (lambda (s) M-state (nextStatement lis) s break throw)) ;if broken, go to finally
+                                           (next (M-state (nextStatement lis) stateList next break throw return))))] 
+      [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (lambda (s) (M-state (nextStatement lis) s next break throw return)) (lambda (s) (M-state (nextStatement lis) s next break throw return)) throw return)]
+      [(eq? (command lis) 'return) (return (M-return (statement lis) stateList))]
+      [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (M-state (nextStatement lis) (pop s) next break throw return))) (lambda (s) (next (M-state (nextStatement lis) (pop s) next break throw return))) throw return)] 
+      [(eq? (command lis) 'try) (M-state (beginBody lis) (push stateList) (M-state (finallyShortcut lis) (lambda (s) M-state (nextStatement lis) s break throw return)) ;next, go to finally
+                                                                            (M-state (finallyShortcut lis) stateList (lambda (s) M-state (nextStatement lis) s break throw return)) ;if broken, go to finally
                                                                               (M-state (catchShortcut lis) stateList ;if exception is thrown, go to catch
                                                                                        (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break)));catch's next statement is finally
                                                                                        (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break)))))] ;catch's break statement is finally
-      [(eq? (command lis) 'catch) (M-state (beginBody lis) stateList (lambda (s) (next s)) (lambda (s) (next s)) throw)]
+      [(eq? (command lis) 'catch) (M-state (beginBody lis) stateList (lambda (s) (next s)) (lambda (s) (next s)) throw return)]
       [(eq? (command lis) 'throw) (throw stateList)]
-      [(eq? (command lis) 'finally) (M-state (beginBody lis) stateList (lambda (s) (next (pop s))) (lambda (s) (next (pop s))) throw)] ;return popped state
+      [(eq? (command lis) 'finally) (M-state (beginBody lis) stateList (lambda (s) (next (pop s))) (lambda (s) (next (pop s))) throw return)] ;return popped state
       [(eq? (command lis) 'break) (break (pop stateList))]
       [(eq? (command lis) 'continue) (next stateList)] 
       [else (error 'Interpreter "Not a valid command")]))) 
 
 ;Helper function for loops
 (define loop
-  (lambda (condition body stateList next break)
+  (lambda (condition body stateList next break throw return)
     (if (M-boolean condition stateList)
-        (M-state body stateList (lambda (s) (loop condition body s next break)) break)
+        (M-state body stateList (lambda (s) (loop condition body s next break throw return)) break throw return)
         (next stateList))))
 
 
@@ -98,7 +100,7 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList next)
     (if (null? (value lis))
         (next (AddBinding (varValue lis) stateList)) ;declare only
-        (next (M-assign lis (AddBinding (varValue lis) stateList) next))))) ;declare and assign
+        (M-assign lis (AddBinding (varValue lis) stateList) next)))) ;declare and assign
         
 ;M-assign - assigns a binding to a variable if the variable doesn't already have a value.
 (define M-assign 
@@ -148,9 +150,9 @@ Project 2 - Simple Language Interpreter
 ;AddBinding - takes a var name and the statelist, creates a new binding with given var.
 (define AddBinding
   (lambda (var stateList)
-    (if (declared? var (frontState stateList))
+    (if (declared? var stateList)
         (error 'Interpreter "Variable already declared.")
-        (cons (list var 'null) (frontState stateList)))))
+        (cons (cons (list var 'null) (frontState stateList)) (followingStates stateList)))))
 
 
 ;CheckBinding - takes a var name and statelist, then returns the value of the variable. returns the first instance of said variable
@@ -158,7 +160,7 @@ Project 2 - Simple Language Interpreter
   (lambda (var bigStateList)
     (cond
       ((null? bigStateList) (error 'Interpreter "Variable has not been declared."))
-      ((equal? (frontState (CheckBindingInside var (frontState bigStateList))) var) (innerFollowingStates (CheckBindingInside var (frontState (bigStateList)))))
+      ((equal? (frontState (CheckBindingInside var (frontState bigStateList))) var) (innerFollowingStates (CheckBindingInside var (frontState bigStateList))))
       (else (CheckBinding var (followingStates bigStateList))))))
 
 ;takes a sub-stateList, and returns the binding of a corresponding variable if it exists. (var varValue)
@@ -166,8 +168,8 @@ Project 2 - Simple Language Interpreter
   (lambda (var stateList)
     (cond
       ((null? stateList) emptyReturn)
-      ((equal? (innerState stateList) var) (frontState stateList))
-      (else (CheckBinding var (followingStates stateList))))))
+      ((equal? (variableDec stateList) var) (frontState stateList))
+      (else (CheckBindingInside var (followingStates stateList))))))
 
 
 ;ChangeBinding - takes a var name, value, and stateList, then returns the stateList with the new variable's value updated.
@@ -175,7 +177,7 @@ Project 2 - Simple Language Interpreter
   (lambda (var newVal bigStateList)
     (cond
       [(null? bigStateList) (error `Interpreter "Variable has not been declared.")]
-      [(declaredInside? var (frontState bigStateList))(cons (ChangeBindingInside var newVal (frontState bigStateList)) (followingStates bigStateList))]
+      [(declaredInside? var (frontState bigStateList)) (cons (ChangeBindingInside var newVal (frontState bigStateList)) (followingStates bigStateList))]
       [else (cons (frontState bigStateList) (ChangeBinding var newVal (followingStates bigStateList)))])))
 
 (define ChangeBindingInside
@@ -185,7 +187,7 @@ Project 2 - Simple Language Interpreter
       ((equal? (variableDec stateList) var) 
        (cons (list var newVal) (followingStates stateList)))
       (else
-       (cons (frontState stateList) (ChangeBinding var newVal (followingStates stateList)))))))
+       (cons (frontState stateList) (ChangeBindingInside var newVal (followingStates stateList)))))))
 
 ;M-integer - checks what kind of operation needs to be performed, returns an integer.
 (define M-integer
