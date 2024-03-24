@@ -68,18 +68,18 @@ Project 2 - Simple Language Interpreter
       [(eq? (command lis) '=)      (M-assign (statement lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))))]
       [(eq? (command lis) 'var)    (M-declare (statement lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))))]
       [(eq? (command lis) 'if)     (if (M-boolean (condition lis) stateList)
-                                       (M-state (statement1 lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return)) break throw return))
+                                       (M-state (statement1 lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return)) break throw return) break throw return)
                                        (if (not (null? (M-else lis)))
-                                           (M-state (statement2 lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw))) break throw)
+                                           (M-state (statement2 lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))) break throw return)
                                            (next (M-state (nextStatement lis) stateList next break throw return))))] 
       [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (lambda (s) (M-state (nextStatement lis) s next break throw return)) (lambda (s) (M-state (nextStatement lis) s next break throw return)) throw return)]
       [(eq? (command lis) 'return) (return (M-return (statement lis) stateList))]
       [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (M-state (nextStatement lis) (pop s) next break throw return))) (lambda (s) (next (M-state (nextStatement lis) (pop s) next break throw return))) throw return)] 
-      [(eq? (command lis) 'try) (M-state (beginBody lis) (push stateList) (M-state (finallyShortcut lis) (lambda (s) M-state (nextStatement lis) s break throw return)) ;next, go to finally
-                                                                            (M-state (finallyShortcut lis) stateList (lambda (s) M-state (nextStatement lis) s break throw return)) ;if broken, go to finally
+      [(eq? (command lis) 'try) (M-state (beginBody lis) (push stateList) (M-state (finallyShortcut lis) (lambda (s) M-state (nextStatement lis) s break throw return) next break throw return) ;next, go to finally
+                                                                            (M-state (finallyShortcut lis) stateList (lambda (s) M-state (nextStatement lis) s break throw return) break throw return) ;if broken, go to finally
                                                                               (M-state (catchShortcut lis) stateList ;if exception is thrown, go to catch
-                                                                                       (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break)));catch's next statement is finally
-                                                                                       (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break)))))] ;catch's break statement is finally
+                                                                                       (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break) throw return));catch's next statement is finally
+                                                                                       (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break) throw return)) throw return))] ;catch's break statement is finally
       [(eq? (command lis) 'catch) (M-state (beginBody lis) stateList (lambda (s) (next s)) (lambda (s) (next s)) throw return)]
       [(eq? (command lis) 'throw) (throw stateList)]
       [(eq? (command lis) 'finally) (M-state (beginBody lis) stateList (lambda (s) (next (pop s))) (lambda (s) (next (pop s))) throw return)] ;return popped state
@@ -212,7 +212,7 @@ Project 2 - Simple Language Interpreter
       [(not (list? lis)) (CheckBinding lis stateList)]
       [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis) stateList) (M-boolean (rightoperand lis) stateList))]
       [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis) stateList) (M-boolean (rightoperand lis) stateList))]
-      [(eq? (operator lis) '!)  (not (M-boolean leftoperand lis) stateList)]
+      [(eq? (operator lis) '!)  (not (M-boolean (leftoperand lis) stateList))]
       [(eq? (operator lis) '==) (eq? (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
       [(eq? (operator lis) '>)  (> (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
       [(eq? (operator lis) '<)  (< (M-expression (leftoperand lis) stateList) (M-expression (rightoperand lis) stateList))]
@@ -238,5 +238,3 @@ Project 2 - Simple Language Interpreter
 (interpret "testthis.txt")
 
 ;END
-
- 
