@@ -72,10 +72,11 @@ Project 2 - Simple Language Interpreter
                                        (if (not (null? (M-else lis)))
                                            (M-state (statement2 lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))) break throw return)
                                            (next (M-state (nextStatement lis) stateList next break throw return))))] 
-      [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (lambda (s) (M-state (nextStatement lis) s next break throw return))
-                                         (call/cc (lambda (k) (lambda (s) (next (M-state (nextStatement lis) s next k throw return))))) throw return)]
+      [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (lambda (s) (next M-state (nextStatement lis) s next break throw return))
+                                         (lambda (s) (break (M-state (nextStatement lis) s next break throw return))) throw return)]
       [(eq? (command lis) 'return) (return (M-return (statement lis) stateList))]
-      [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (M-state (nextStatement lis) (pop s) next break throw return)))(lambda (s) (break (M-state (nextStatement lis) (pop s) next break throw return))) throw return)] 
+      [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (M-state (nextStatement lis) (pop s) next break throw return)))
+                                           (lambda (s) (call/cc (lambda k (break (M-state (nextStatement lis) (pop s) next k throw return))))) throw return)] 
       [(eq? (command lis) 'try) (M-state (car (beginBody lis)) (push stateList) (lambda (s1) (next (if (null? (car (finallyShortcut lis))) (M-state (nextStatement lis) s1 next break throw return) ;if there's no finally, next go to nextStatement
                                                                                               (M-state (finallyShortcut lis) s1 (lambda (s) (M-state (nextStatement lis) s next break throw return)) break throw return)))) ;next, go to finally
                                                                             (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s) (next (M-state (nextStatement lis) s next break throw return))) break throw return)) ;if broken, go to finally
