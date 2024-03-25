@@ -26,6 +26,7 @@ Project 2 - Simple Language Interpreter
 (define statement2 (lambda (v) (list (cadr (cddar v)))))
 (define beginBody cdar)
 (define emptyReturn '(()))
+(define lisBeginning car)
 
 ;initial values
 (define initialState '(()))
@@ -56,6 +57,8 @@ Project 2 - Simple Language Interpreter
 ;finally/catch
 (define finallyShortcut
   (lambda (v) (cdr (cdr (cdr (car v))))))
+(define finallyPoint car)
+(define finallyPointAlt cadr)
 (define catchShortcut
   (lambda (v) (list (cadr (cdr (car v))))))
 
@@ -91,16 +94,16 @@ Project 2 - Simple Language Interpreter
       [(eq? (command lis) 'return)   (return (M-return (statement lis) stateList))]
       [(eq? (command lis) 'begin)    (M-state (beginBody lis) (push stateList) (lambda (s) (next (M-state (nextStatement lis) (pop s) next break throw return)))
                                            (lambda (s) (call/cc (lambda k (break (M-state (nextStatement lis) (pop s) next k throw return))))) throw return)] 
-      [(eq? (command lis) 'try)      (M-state (car (beginBody lis)) (push stateList) (lambda (s1) (if (null? (car (finallyShortcut lis))) (next (M-state (nextStatement lis) (pop s1) next break throw return)) ;if there's no finally, next go to nextStatement
+      [(eq? (command lis) 'try)      (M-state (lisBeginning (beginBody lis)) (push stateList) (lambda (s1) (if (null? (finallyPoint (finallyShortcut lis))) (next (M-state (nextStatement lis) (pop s1) next break throw return)) ;if there's no finally, next go to nextStatement
                                                                                                       (next (M-state (finallyShortcut lis) s1 (lambda (s) (M-state (nextStatement lis) s next break throw return)) break throw return)))) ;next, go to finally
                                               (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s) (next (M-state (nextStatement lis) s next break throw return))) break throw return)) ;if broken, go to finally
-                                              (lambda (e s) (M-state (catchShortcut lis) (ChangeBinding (caar (beginBody (catchShortcut lis))) e (AddBinding (caar (beginBody (catchShortcut lis))) s)) ;if exception is thrown, go to catch
-                                                                     (lambda (s1) (if (null? (car (finallyShortcut lis))) (M-state (nextStatement lis) (pop s1) next break throw return)
+                                              (lambda (e s) (M-state (catchShortcut lis) (ChangeBinding (innerState (beginBody (catchShortcut lis))) e (AddBinding (innerState (beginBody (catchShortcut lis))) s)) ;if exception is thrown, go to catch
+                                                                     (lambda (s1) (if (null? (finallyPoint (finallyShortcut lis))) (M-state (nextStatement lis) (pop s1) next break throw return)
                                                                                       (M-state (finallyShortcut lis) s1 (lambda (s2) (M-state (nextStatement lis) s2 next break throw return)) break throw return)));catch's next statement is finally
                                                                      break throw return)) return)] ;catch's break statement is finally
-      [(eq? (command lis) 'catch)    (M-state (cadr (beginBody lis)) stateList (lambda (s) (next s)) (lambda (s) (next s)) throw return)]
+      [(eq? (command lis) 'catch)    (M-state (finallyPointAlt (beginBody lis)) stateList (lambda (s) (next s)) (lambda (s) (next s)) throw return)]
       [(eq? (command lis) 'throw)    (throw (cadar lis) stateList)]
-      [(eq? (command lis) 'finally)  (M-state (car (beginBody lis)) stateList
+      [(eq? (command lis) 'finally)  (M-state (lisBeginning (beginBody lis)) stateList
                                               (lambda (s) (next (pop s)))
                                               (lambda (s) (next (pop s))) throw return)] ;return popped state
       [(eq? (command lis) 'break)    (break stateList)]
@@ -115,7 +118,6 @@ Project 2 - Simple Language Interpreter
                  (lambda (s) (loop condition body s next break throw return))
                  break throw return)
         (next stateList))))
-
 
 ;M-declare - declares a variable, either with or without a binding to a value.
 (define M-declare
@@ -157,17 +159,17 @@ Project 2 - Simple Language Interpreter
 (define declared?
   (lambda (var bigStateList)
     (cond
-      ((null? bigStateList)                     #f)
-      ((declaredInside? var (car bigStateList)) #t)
-      (else                                    (declared? var (cdr bigStateList))))))
+      ((null? bigStateList)                            #f)
+      ((declaredInside? var (frontState bigStateList)) #t)
+      (else                                            (declared? var (followingStates bigStateList))))))
 
-;delcaredInside? - helper for declared? for deeper states.
+;delcaredInside? - helper for declared? that dives into deeper states.
 (define declaredInside?
   (lambda (var stateList)
     (cond
       ((null?  stateList)                  #f)
       ((equal?(variableDec stateList) var) #t)
-      (else                                (declaredInside? var (cdr stateList))))))
+      (else                                (declaredInside? var (followingStates stateList))))))
 
 ;AddBinding - takes a var name and the statelist, creates a new binding with given var.
 (define AddBinding
