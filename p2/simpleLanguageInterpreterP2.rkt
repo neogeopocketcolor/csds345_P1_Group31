@@ -25,8 +25,8 @@ Project 2 - Simple Language Interpreter
 
 (define initialState '(()))
 (define initialNext (lambda (v) v))
-(define initialBreak (lambda (v) (error 'Interpreter "Break command executed in main.")))
-(define initialThrow (lambda (v) v))
+(define initialBreak (lambda (v) (error 'Interpreter "'break' command executed in main.")))
+(define initialThrow (lambda (v) (error 'Interpreter "'throw' must be used within a 'try'")))
 
 (define variableDec caar)
 (define varValue cadr)
@@ -73,16 +73,17 @@ Project 2 - Simple Language Interpreter
                                            (M-state (statement2 lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))) break throw return)
                                            (next (M-state (nextStatement lis) stateList next break throw return))))] 
       [(eq? (command lis) 'while)  (loop (condition lis) (body lis) stateList (lambda (s) (M-state (nextStatement lis) s next break throw return))
-                                         (call/cc (lambda (k) (lambda (s) (M-state (nextStatement lis) s next k throw return)))) throw return)]
+                                         (call/cc (lambda (k) (lambda (s) (next (M-state (nextStatement lis) s next k throw return))))) throw return)]
       [(eq? (command lis) 'return) (return (M-return (statement lis) stateList))]
       [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (M-state (nextStatement lis) (pop s) next break throw return)))(lambda (s) (break (M-state (nextStatement lis) (pop s) next break throw return))) throw return)] 
-      [(eq? (command lis) 'try) (M-state (car (beginBody lis)) (push stateList) (lambda (s1) (next (M-state (finallyShortcut lis) s1 (lambda (s) (M-state (nextStatement lis) s next break throw return)) break throw return))) ;next, go to finally
-                                                                            (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s) M-state (nextStatement lis) s break throw return) break throw return)) ;if broken, go to finally
-                                                                              (lambda (s2) (M-state (catchShortcut lis) s2 ;if exception is thrown, go to catch
+      [(eq? (command lis) 'try) (M-state (car (beginBody lis)) (push stateList) (lambda (s1) (next (if (null? (car (finallyShortcut lis))) (M-state (nextStatement lis) s1 next break throw return) ;if there's no finally, next go to nextStatement
+                                                                                              (M-state (finallyShortcut lis) s1 (lambda (s) (M-state (nextStatement lis) s next break throw return)) break throw return)))) ;next, go to finally
+                                                                            (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s) (next (M-state (nextStatement lis) s next break throw return))) break throw return)) ;if broken, go to finally
+                                                                              (lambda (e) (M-state (catchShortcut lis) (ChangeBinding (caar (beginBody (catchShortcut lis))) e (AddBinding (caar (beginBody (catchShortcut lis))) (push stateList))) ;if exception is thrown, go to catch
                                                                                        (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) (M-state (nextStatement lis) s2 next break throw return)) break throw return));catch's next statement is finally
                                                                                        (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) (M-state (nextStatement lis) s2 next break throw return)) break throw return)) throw return)) return)] ;catch's break statement is finally
       [(eq? (command lis) 'catch) (M-state (cadr (beginBody lis)) stateList (lambda (s) (next s)) (lambda (s) (next s)) throw return)]
-      [(eq? (command lis) 'throw) (throw (ChangeBinding 'e (cadar lis) (AddBinding 'e stateList)))]
+      [(eq? (command lis) 'throw) (throw (cadar lis))]
       [(eq? (command lis) 'finally) (M-state (car (beginBody lis)) stateList (lambda (s) (next (pop s))) (lambda (s) (next (pop s))) throw return)] ;return popped state
       [(eq? (command lis) 'break) (break stateList)]
       [(eq? (command lis) 'continue) (next stateList)] 
