@@ -25,7 +25,7 @@ Project 2 - Simple Language Interpreter
 
 (define initialState '(()))
 (define initialNext (lambda (v) v))
-(define initialBreak (lambda (v) v))
+(define initialBreak (lambda (v) (error 'Interpreter "Break command executed in main.")))
 (define initialThrow (lambda (v) v))
 
 (define variableDec caar)
