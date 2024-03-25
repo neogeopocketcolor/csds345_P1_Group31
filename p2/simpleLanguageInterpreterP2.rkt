@@ -76,7 +76,7 @@ Project 2 - Simple Language Interpreter
       [(eq? (command lis) 'return) (return (M-return (statement lis) stateList))]
       [(eq? (command lis) 'begin) (M-state (beginBody lis) (push stateList) (lambda (s) (next (M-state (nextStatement lis) (pop s) next break throw return))) (lambda (s) (next (M-state (nextStatement lis) (pop s) next break throw return))) throw return)] 
       [(eq? (command lis) 'try) (M-state (beginBody lis) (push stateList) (M-state (finallyShortcut lis) (lambda (s) M-state (nextStatement lis) s break throw return) next break throw return) ;next, go to finally
-                                                                            (M-state (finallyShortcut lis) stateList (lambda (s) M-state (nextStatement lis) s break throw return) break throw return) ;if broken, go to finally
+                                                                            (M-state (finallyShortcut lis) stateList (lambda (s) M-state (nextStatement lis) s break throw return)) ;if broken, go to finally
                                                                               (M-state (catchShortcut lis) stateList ;if exception is thrown, go to catch
                                                                                        (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break) throw return));catch's next statement is finally
                                                                                        (lambda (s1) (M-state (finallyShortcut lis) s1 (lambda (s2) M-state (nextStatement lis) s2 break) throw return)) throw return))] ;catch's break statement is finally
@@ -238,3 +238,5 @@ Project 2 - Simple Language Interpreter
 (interpret "testthis.txt")
 
 ;END
+
+ 
