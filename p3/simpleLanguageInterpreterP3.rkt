@@ -107,8 +107,17 @@ Project 2 - Simple Language Interpreter
                                               (lambda (s) (next (pop s)))
                                               (lambda (s) (next (pop s))) throw return)] ;return popped state
       [(eq? (command lis) 'break)    (break stateList)]
-      [(eq? (command lis) 'continue) (next stateList)] 
-      [else                          (error 'Interpreter "Not a valid command")]))) 
+      [(eq? (command lis) 'continue) (next stateList)]
+      [(eq? (command lis) 'function) "how we will evaluate functions"]
+      [(eq? (command lis) 'funcall) "how we call functions"]
+      [else                          (error 'Interpreter "Not a valid command")])))
+
+;
+;; Function-Related Functions
+;
+
+
+
 
 ;Helper function for loops
 (define loop
@@ -177,7 +186,6 @@ Project 2 - Simple Language Interpreter
     (if (declared? var stateList)
         (error 'Interpreter "Variable already declared.")
         (cons (cons (list var 'null) (frontState stateList)) (followingStates stateList)))))
-
 
 ;CheckBinding - takes a var name and statelist, then returns the value of the variable. returns the first instance of said variable
 (define CheckBinding
