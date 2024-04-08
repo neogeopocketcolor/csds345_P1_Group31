@@ -1,15 +1,8 @@
 var x;
 
-try {
-  x = 20;
-  if (x > 10)
-    throw 10;
-  x = x + 5;
+function main () {
+  var x;
+  var y = 2;
+  x = 15;
+  return x + y;
 }
-catch(e) {
-  x = e;
-}
-finally {
-  x = x + 100;
-}
-return x;

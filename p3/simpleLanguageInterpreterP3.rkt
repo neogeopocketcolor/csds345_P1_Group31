@@ -77,6 +77,18 @@ Project 2 - Simple Language Interpreter
      (lambda (initialReturn)
        (M-state (parser filename) initialState initialNext initialBreak initialThrow initialReturn)))))
 
+;M-state-first - First run of M-state that stores functions and variables, allows variables to be set, and that's it. Throw everything else.
+(define M-state-first
+  (lambda (lis stateList next break throw return)
+    (cond
+      [(null? lis) stateList]
+      [(eq? (command lis) '=)        (M-assign (statement lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))))]
+      [(eq? (command lis) 'var)      (M-declare (statement lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))))]
+      [(eq? (command lis) 'function) "how we will evaluate functions"]
+      [(eq? (command lis) 'funcall)  "how we call functions"]
+      [else                          (error 'Interpreter "Unallowed operation outside of functions")]
+      )))
+      
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
   (lambda (lis stateList next break throw return)
@@ -118,6 +130,10 @@ Project 2 - Simple Language Interpreter
 
 
 
+
+;
+;; General Use
+;
 
 ;Helper function for loops
 (define loop
@@ -163,6 +179,10 @@ Project 2 - Simple Language Interpreter
       [(eq? '* val)  #t]
       [(eq? '% val)  #t]
       [else          #f])))
+
+;
+;;Variable Declare Functions
+;
 
 ;declared? - takes a var name and the stateList, returning #t if var name exists in statelist. ex: (declared? 'x ((x 3))) returns #t.
 (define declared?
@@ -220,6 +240,72 @@ Project 2 - Simple Language Interpreter
       ((equal? (variableDec stateList) var) (cons (list var newVal) (followingStates stateList)))
       (else                                 (cons (frontState stateList) (ChangeBindingInside var newVal (followingStates stateList)))))))
 
+;
+;;Function Declare Functions
+;;;THE BIG SHIT WE NEED 2 DO I THINK ??
+;;Function Declare Functions
+;
+
+;declaredFunction? - takes a var name and the stateList, returning #t if var name exists in statelist. ex: (declared? 'x ((x 3))) returns #t.
+(define declaredFunction?
+  (lambda (var bigStateList)
+    (cond
+      ((null? bigStateList)                            #f)
+      ((declaredFunctionInside? var (frontState bigStateList)) #t)
+      (else                                            (declared? var (followingStates bigStateList))))))
+
+;declaredFunctionInside? - helper for declared? that dives into deeper states.
+(define declaredFunctionInside?
+  (lambda (var stateList)
+    (cond
+      ((null?  stateList)                  #f)
+      ((equal?(variableDec stateList) var) #t)
+      (else                                (declaredFunctionInside? var (followingStates stateList))))))
+
+;AddFunctionBinding - takes a var name and the statelist, creates a new binding with given var.
+(define AddFunctionBinding
+  (lambda (var stateList)
+    (if (declared? var stateList)
+        (error 'Interpreter "Variable already declared.")
+        (cons (cons (list var 'null) (frontState stateList)) (followingStates stateList)))))
+
+;CheckFunctionBinding - takes a var name and statelist, then returns the value of the variable. returns the first instance of said variable
+(define CheckFunctionBinding
+  (lambda (var bigStateList)
+    (cond
+      ((null? bigStateList)                                                         (error 'Interpreter "Variable has not been declared."))
+      ((equal? (frontState (CheckFunctionBindingInside var (frontState bigStateList))) var) (innerFollowingStates (CheckFunctionBindingInside var (frontState bigStateList))))
+      (else                                                                         (CheckFunctionBinding var (followingStates bigStateList))))))
+
+;CheckFunctionBindingInside - takes a sub-stateList, and returns the binding of a corresponding variable if it exists. (var varValue)
+(define CheckFunctionBindingInside
+  (lambda (var stateList)
+    (cond
+      ((null? stateList)                     emptyReturn)
+      ((equal? (variableDec stateList) var) (frontState stateList))
+      (else                                 (CheckFunctionBindingInside var (followingStates stateList))))))
+
+
+;ChangeFunctionBinding - takes a var name, value, and stateList, then returns the stateList with the new variable's value updated.
+(define ChangeFunctionBinding
+  (lambda (var newVal bigStateList)
+    (cond
+      [(null? bigStateList)                            (error `Interpreter "Variable has not been declared.")]
+      [(declaredInside? var (frontState bigStateList)) (cons (ChangeFunctionBindingInside var newVal (frontState bigStateList)) (followingStates bigStateList))]
+      [else                                            (cons (frontState bigStateList) (ChangeFunctionBinding var newVal (followingStates bigStateList)))])))
+
+;ChangeFunctionBindingInside - helper for ChangeBinding for deeper states.
+(define ChangeFunctionBindingInside
+  (lambda (var newVal stateList)
+    (cond
+      ((null? stateList)                     stateList)
+      ((equal? (variableDec stateList) var) (cons (list var newVal) (followingStates stateList)))
+      (else                                 (cons (frontState stateList) (ChangeFunctionBindingInside var newVal (followingStates stateList)))))))
+
+;
+;; M-state related checks
+;
+
 ;M-integer - checks what kind of operation needs to be performed, returns an integer.
 (define M-integer
   (lambda (lis stateList)
@@ -267,4 +353,6 @@ Project 2 - Simple Language Interpreter
 
 ;END
 
+(parser "testthis.txt")
+(interpret "testthis.txt")
  

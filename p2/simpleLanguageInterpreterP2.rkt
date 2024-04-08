@@ -259,4 +259,7 @@ Project 2 - Simple Language Interpreter
 
 ;END
 
+(parser "testthis.txt")
+(interpret "testthis.txt")
+
  
