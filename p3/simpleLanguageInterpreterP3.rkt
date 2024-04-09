@@ -91,9 +91,7 @@ Project 2 - Simple Language Interpreter
         - 2. Every time a new function is called
     - and stores the functions of an env before doing anything else?
 |#
-
-
-      
+  
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
   (lambda (lis stateList funcList next break throw return)
@@ -295,7 +293,7 @@ Project 2 - Simple Language Interpreter
     (cond
       ((null? bigFuncList)                            #f)
       ((declaredFunctionInside? func (frontState bigFuncList)) #t)
-      (else                                            (declared? func (followingStates bigFuncList))))))
+      (else                                            (declaredFunction? func (followingStates bigFuncList))))))
 
 ;declaredFunctionInside? - helper for declared? that dives into deeper states.
 (define declaredFunctionInside?
