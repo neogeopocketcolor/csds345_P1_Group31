@@ -132,7 +132,7 @@ Project 2 - Simple Language Interpreter
       [(eq? (command lis) 'break)    (break stateList)]
       [(eq? (command lis) 'continue) (next stateList)]
       
-      [(eq? (command lis) 'function) (M-declareFunction (statement lis) funcList (lambda (s f) (next (M-state (nextStatement lis) stateList f next break throw return))))]
+      [(eq? (command lis) 'function) (M-declareFunction lis (statement lis) funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return))))]
       [(eq? (command lis) 'funcall)  (M-funcall (statement lis) (push stateList) (push funcList) (lambda (s) (next (M-state (nextStatement lis) (pop s) (pop funcList) next break throw return))))]
       [else                          (error 'Interpreter "Not a valid command")])))
 
@@ -168,7 +168,7 @@ Project 2 - Simple Language Interpreter
 ;M-declareFunction - declares a function, binding the function's name, (formal parameters), and (comamands), into one readable lis.
 (define M-declareFunction
   (lambda (lis stateList funcList next)
-    (next (AddFunctionBinding (cdr lis) funcList))))
+    (next stateList (AddFunctionBinding (cdr lis) funcList)))) ; not 100% sure if it should be stateList here
 
 ;M-funcall - handles the calling of a function. Finds if the function's name exists in stateList, and if it does
 #|
