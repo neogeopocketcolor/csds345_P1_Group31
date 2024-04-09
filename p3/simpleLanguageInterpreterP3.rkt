@@ -67,6 +67,10 @@ Project 2 - Simple Language Interpreter
 (define pop cdr)
 (define push (lambda (v) (cons '() v)))
 
+;functions
+(define paramList car)
+(define commandList cdr)
+
 ;;
 ;;;Proper Functions
 ;;
@@ -131,7 +135,7 @@ Project 2 - Simple Language Interpreter
       [(eq? (command lis) 'continue) (next stateList)]
       
       [(eq? (command lis) 'function) (M-declareFunction (statement lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))))]
-      [(eq? (command lis) 'funcall)  "how we call functions"]
+      [(eq? (command lis) 'funcall)  (M-funcall (statement lis) (push stateList) (push funcList) (lambda (s) (next (M-state (nextStatement lis) (pop s) (pop funcList) next break throw return))))]
       [else                          (error 'Interpreter "Not a valid command")])))
 
 
@@ -186,6 +190,15 @@ Project 2 - Simple Language Interpreter
             - If lengths of param lists don’t match, throw error
         - 3. Call M-state on the first command of the list and just go from there as you would w/ a try/catch.
 |#
+(define M-funcall
+  (lambda (lis stateList funcList next)
+      (next (M-state (commandList (CheckFunctionBinding (leftOperand lis) funcList)) (parametize (paramList (CheckFunctionBinding (leftOperand lis) funcList)) (rightOperand lis)) funcList initialNext initialBreak initialThrow initialReturn))))
+      
+
+(define parametize
+  (lambda (formal actual stateList)
+    (if (null? formal) stateList
+        (parametize (cdr formal) (cdr actual) (M-declare (cons 'var (list (car formal) (car actual))))))))
 
 ;M-expression - checks if an operation needs to return a number (math equation) or a boolean (t/f).
 (define M-expression
@@ -300,36 +313,19 @@ Project 2 - Simple Language Interpreter
 
 ;CheckFunctionBinding - takes a var name and statelist, then returns the value of the variable. returns the first instance of said variable
 (define CheckFunctionBinding
-  (lambda (var bigStateList)
+  (lambda (func bigFuncList)
     (cond
-      ((null? bigStateList)                                                         (error 'Interpreter "Variable has not been declared."))
-      ((equal? (frontState (CheckFunctionBindingInside var (frontState bigStateList))) var) (innerFollowingStates (CheckFunctionBindingInside var (frontState bigStateList))))
-      (else                                                                         (CheckFunctionBinding var (followingStates bigStateList))))))
+      ((null? bigFuncList)                                                         (error 'Interpreter "Function has not been declared."))
+      ((equal? (frontState (CheckFunctionBindingInside func (frontState bigFuncList))) func) (followingStates (CheckFunctionBindingInside func (frontState bigFuncList)))) ;change abstract?
+      (else                                                                         (CheckFunctionBinding func (followingStates bigFuncList))))))
 
 ;CheckFunctionBindingInside - takes a sub-stateList, and returns the binding of a corresponding variable if it exists. (var varValue)
 (define CheckFunctionBindingInside
-  (lambda (var stateList)
+  (lambda (func funcList)
     (cond
-      ((null? stateList)                     emptyReturn)
-      ((equal? (variableDec stateList) var) (frontState stateList))
-      (else                                 (CheckFunctionBindingInside var (followingStates stateList))))))
-
-
-;ChangeFunctionBinding - takes a var name, value, and stateList, then returns the stateList with the new variable's value updated.
-(define ChangeFunctionBinding
-  (lambda (var newVal bigStateList)
-    (cond
-      [(null? bigStateList)                            (error `Interpreter "Variable has not been declared.")]
-      [(declaredInside? var (frontState bigStateList)) (cons (ChangeFunctionBindingInside var newVal (frontState bigStateList)) (followingStates bigStateList))]
-      [else                                            (cons (frontState bigStateList) (ChangeFunctionBinding var newVal (followingStates bigStateList)))])))
-
-;ChangeFunctionBindingInside - helper for ChangeBinding for deeper states.
-(define ChangeFunctionBindingInside
-  (lambda (var newVal stateList)
-    (cond
-      ((null? stateList)                     stateList)
-      ((equal? (variableDec stateList) var) (cons (list var newVal) (followingStates stateList)))
-      (else                                 (cons (frontState stateList) (ChangeFunctionBindingInside var newVal (followingStates stateList)))))))
+      ((null? funcList)                     emptyReturn)
+      ((equal? (variableDec funcList) func) (frontState funcList))
+      (else                                 (CheckFunctionBindingInside func (followingStates funcList))))))
 
 ;
 ;; M-state related checks
