@@ -173,7 +173,6 @@ Project 2 - Simple Language Interpreter
             -  Take param1 from the storage, and declare that as a new variable with the value of the input value (cadr of funcall)
             - If lengths of param lists don’t match, throw error
         - 3. Call M-state on the first command of the list and just go from there as you would w/ a try/catch.
-        - The main problem is finding a way to sneak in the variable declarations
 |#
 
 
