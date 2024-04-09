@@ -132,7 +132,7 @@ Project 2 - Simple Language Interpreter
       [(eq? (command lis) 'break)    (break stateList)]
       [(eq? (command lis) 'continue) (next stateList)]
       
-      [(eq? (command lis) 'function) (M-declareFunction (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) stateList f next break throw return))))]
+      [(eq? (command lis) 'function) (M-declareFunction (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) stateList f next break throw return) funcList)))]
       [(eq? (command lis) 'funcall)  (M-funcall (statement lis) (push stateList) (push funcList) (lambda (s) (next (M-state (nextStatement lis) (pop s) (pop funcList) next break throw return))))]
       [else                          (error 'Interpreter "Not a valid command")])))
 
