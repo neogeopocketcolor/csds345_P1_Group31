@@ -101,9 +101,9 @@ Project 2 - Simple Language Interpreter
       [(eq? (command lis) 'var)      (M-declare (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return))))]
       
       [(eq? (command lis) 'if)       (if (M-boolean (condition lis) stateList funcList next)
-                                         (M-state (statement1 lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return)) break throw return) break throw return)
+                                         (M-state (statement1 lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return)) break throw return) break throw return)
                                          (if (not (null? (M-else lis)))
-                                             (M-state (statement2 lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return))) break throw return)
+                                             (M-state (statement2 lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return))) break throw return)
                                              (next (M-state (nextStatement lis) stateList funcList next break throw return))))]
       
       [(eq? (command lis) 'while)    (loop (condition lis) (body lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return)))
@@ -132,7 +132,7 @@ Project 2 - Simple Language Interpreter
       [(eq? (command lis) 'break)    (break stateList)]
       [(eq? (command lis) 'continue) (next stateList)]
       
-      [(eq? (command lis) 'function) (M-declareFunction lis (statement lis) funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return))))]
+      [(eq? (command lis) 'function) (M-declareFunction (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) stateList f next break throw return))))]
       [(eq? (command lis) 'funcall)  (M-funcall (statement lis) (push stateList) (push funcList) (lambda (s) (next (M-state (nextStatement lis) (pop s) (pop funcList) next break throw return))))]
       [else                          (error 'Interpreter "Not a valid command")])))
 
@@ -163,12 +163,12 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList funcList next)
     (if (not (declared? (leftoperand lis) stateList))
         (error 'Interpreter "Variable not declared. :(")
-        (next (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList funcList next) stateList funcList)))))
+        (next (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList funcList next) stateList funcList) funcList))))
 
 ;M-declareFunction - declares a function, binding the function's name, (formal parameters), and (comamands), into one readable lis.
 (define M-declareFunction
   (lambda (lis stateList funcList next)
-    (next stateList (AddFunctionBinding (cdr lis) funcList)))) ; not 100% sure if it should be stateList here
+    (next stateList (AddFunctionBinding (cdr lis) funcList))))
 
 ;M-funcall - handles the calling of a function. Finds if the function's name exists in stateList, and if it does
 #|
@@ -373,7 +373,7 @@ Project 2 - Simple Language Interpreter
       ((eq? #t (returnVal statement))              'true)
       ((eq? #f (returnVal statement))              'false)
       ((pair? (returnVal statement))               (M-return (returnify (M-expression (returnVal statement) stateList funcList initialNext)) stateList)) ;if an expression, call m-expression
-      ((declared? (returnVal statement) stateList) (M-return (returnify (CheckBinding (returnVal statement) stateList funcList)) stateList)) ;check if statement is a declared variable, if so return the value.
+      ((declared? (returnVal statement) stateList) (M-return (returnify (CheckBinding (returnVal statement) stateList)) stateList funcList next)) ;check if statement is a declared variable, if so return the value.
       (else                                        (error 'Interpreter "M-return error - Not accounted for")))))
 
 ;END
