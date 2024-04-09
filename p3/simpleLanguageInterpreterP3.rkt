@@ -196,7 +196,7 @@ Project 2 - Simple Language Interpreter
 (define parametize
   (lambda (formal actual stateList)
     (if (null? formal) stateList
-        (parametize (cdr formal) (cdr actual) (M-declare (cons 'var (list (car formal) (car actual))))))))
+        (parametize (cdr formal) (cdr actual) (M-declare (cons 'var (list (car formal) (M-expression (car actual) funcList next))))))))
 
 ;M-expression - checks if an operation needs to return a number (math equation) or a boolean (t/f).
 (define M-expression
