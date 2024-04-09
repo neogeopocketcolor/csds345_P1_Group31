@@ -31,7 +31,7 @@ Project 2 - Simple Language Interpreter
 ;initial values
 (define initialState '(()))
 (define initialFunc '(()))
-(define initialNext (lambda (v) v))
+(define initialNext (lambda (v1 v2) v1))
 (define initialBreak (lambda (v) (error 'Interpreter "'break' command executed in main.")))
 (define initialThrow (lambda (v) (error 'Interpreter "'throw' must be used within a 'try'")))
 
@@ -80,7 +80,7 @@ Project 2 - Simple Language Interpreter
   (lambda (filename)
     (call/cc
      (lambda (initialReturn)
-       (M-state (parser filename) initialState initialFunc (lambda (s f) (M-funcall '(funcall main ()) (push s) (push f) initialNext)) initialBreak initialThrow initialReturn)))))
+       (M-state (parser filename) initialState initialFunc (lambda (s f) (initialReturn (M-funcall '(funcall main ()) (push s) (push f) initialNext))) initialBreak initialThrow initialReturn)))))
 
 #|
 - Assumedly we’d want to go through the parsed code once first to store global variables.
@@ -97,16 +97,16 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList funcList next break throw return)
     (cond
       [(null? lis) (next stateList funcList)]
-      [(eq? (command lis) '=)        (M-assign (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return))))]
-      [(eq? (command lis) 'var)      (M-declare (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return))))]
+      [(eq? (command lis) '=)        (M-assign (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return) f)))]
+      [(eq? (command lis) 'var)      (M-declare (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return) f)))]
       
       [(eq? (command lis) 'if)       (if (M-boolean (condition lis) stateList funcList next)
-                                         (M-state (statement1 lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return)) break throw return) break throw return)
+                                         (M-state (statement1 lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return) f) break throw return) break throw return)
                                          (if (not (null? (M-else lis)))
-                                             (M-state (statement2 lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return))) break throw return)
-                                             (next (M-state (nextStatement lis) stateList funcList next break throw return))))]
+                                             (M-state (statement2 lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return) f)) break throw return)
+                                             (next (M-state (nextStatement lis) stateList funcList next break throw return) funcList)))]
       
-      [(eq? (command lis) 'while)    (loop (condition lis) (body lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return)))
+      [(eq? (command lis) 'while)    (loop (condition lis) (body lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return) funcList))
                                            (lambda (s) (break (M-state (nextStatement lis) s funcList next break throw return))) throw return)]
       [(eq? (command lis) 'return)   (return (M-return (statement lis) stateList funcList next))]
       
@@ -270,12 +270,12 @@ Project 2 - Simple Language Interpreter
   (lambda (var newVal bigStateList funcList)
     (cond
       [(null? bigStateList)                            (error `Interpreter "Variable has not been declared.")]
-      [(declaredInside? var (frontState bigStateList)) (cons (ChangeBindingInside var newVal (frontState bigStateList) funcList) (followingStates bigStateList))]
+      [(declaredInside? var (frontState bigStateList)) (cons (ChangeBindingInside var newVal (frontState bigStateList)) (followingStates bigStateList))]
       [else                                            (cons (frontState bigStateList) (ChangeBinding var newVal (followingStates bigStateList) funcList))])))
 
 ;ChangeBindingInside - helper for ChangeBinding for deeper states.
 (define ChangeBindingInside
-  (lambda (var newVal stateList funcList)
+  (lambda (var newVal stateList)
     (cond
       ((null? stateList)                     stateList)
       ((equal? (variableDec stateList) var) (cons (list var newVal) (followingStates stateList)))
@@ -335,7 +335,7 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList funcList)
     (cond
       [(number? lis)                 lis]
-      [(not (list? lis))             (CheckBinding lis stateList funcList)]
+      [(not (list? lis))             (CheckBinding lis stateList)]
       [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList (lambda (v) v))]
       [(eq? (operator lis) '+)       (+ (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
       [(and (eq? (operator lis) '-)  (null? (value lis))) (- 0 (M-integer (leftoperand lis) stateList funcList))]
