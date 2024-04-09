@@ -69,7 +69,7 @@ Project 2 - Simple Language Interpreter
 
 ;functions
 (define paramList car)
-(define commandList cdr)
+(define commandList cadr)
 
 ;;
 ;;;Proper Functions
@@ -80,7 +80,7 @@ Project 2 - Simple Language Interpreter
   (lambda (filename)
     (call/cc
      (lambda (initialReturn)
-       (M-state (parser filename) initialState initialFunc (lambda (s f) (M-funcall (list 'funcall 'main) s f initialNext)) initialBreak initialThrow initialReturn)))))
+       (M-state (parser filename) initialState initialFunc (lambda (s f) (M-funcall '(funcall main ()) (push s) (push f) initialNext)) initialBreak initialThrow initialReturn)))))
 
 #|
 - Assumedly we’d want to go through the parsed code once first to store global variables.
@@ -97,8 +97,8 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList funcList next break throw return)
     (cond
       [(null? lis) (next stateList funcList)]
-      [(eq? (command lis) '=)        (M-assign (statement lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return))))]
-      [(eq? (command lis) 'var)      (M-declare (statement lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return))))]
+      [(eq? (command lis) '=)        (M-assign (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return))))]
+      [(eq? (command lis) 'var)      (M-declare (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return))))]
       
       [(eq? (command lis) 'if)       (if (M-boolean (condition lis) stateList funcList next)
                                          (M-state (statement1 lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return)) break throw return) break throw return)
@@ -132,7 +132,7 @@ Project 2 - Simple Language Interpreter
       [(eq? (command lis) 'break)    (break stateList)]
       [(eq? (command lis) 'continue) (next stateList)]
       
-      [(eq? (command lis) 'function) (M-declareFunction (statement lis) funcList (lambda (f) (next (M-state (nextStatement lis) stateList f next break throw return))))]
+      [(eq? (command lis) 'function) (M-declareFunction (statement lis) funcList (lambda (s f) (next (M-state (nextStatement lis) stateList f next break throw return))))]
       [(eq? (command lis) 'funcall)  (M-funcall (statement lis) (push stateList) (push funcList) (lambda (s) (next (M-state (nextStatement lis) (pop s) (pop funcList) next break throw return))))]
       [else                          (error 'Interpreter "Not a valid command")])))
 
@@ -155,19 +155,19 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList funcList next)
     (if (null? (value lis))
         (next (AddBinding (varValue lis) stateList funcList)) ;declare only
-        (M-assign lis (AddBinding (varValue lis) stateList funcList) funcList next)))) ;declare and assign
+        (M-assign lis (AddBinding (varValue lis) stateList) funcList next)))) ;declare and assign
 
         
 ;M-assign - assigns a binding to a variable if the variable doesn't already have a value.
 (define M-assign 
   (lambda (lis stateList funcList next)
-    (if (not (declared? (leftoperand lis) stateList funcList))
+    (if (not (declared? (leftoperand lis) stateList))
         (error 'Interpreter "Variable not declared. :(")
         (next (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList funcList next) stateList funcList)))))
 
 ;M-declareFunction - declares a function, binding the function's name, (formal parameters), and (comamands), into one readable lis.
 (define M-declareFunction
-  (lambda (lis funcList next)
+  (lambda (lis stateList funcList next)
     (next (AddFunctionBinding (cdr lis) funcList))))
 
 ;M-funcall - handles the calling of a function. Finds if the function's name exists in stateList, and if it does
@@ -190,7 +190,7 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList funcList next)
     (call/cc
      (lambda (initialReturn)
-       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (rightoperand lis) funcList next) funcList initialNext initialBreak initialThrow initialReturn))))))
+       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (rightoperand lis) stateList funcList next) funcList initialNext initialBreak initialThrow initialReturn))))))
       
 
 (define parametize
@@ -206,7 +206,7 @@ Project 2 - Simple Language Interpreter
                                      (M-integer lis stateList funcList)(M-boolean lis stateList funcList next))]
       [(declared? lis stateList)     (M-expression (CheckBinding lis stateList funcList) stateList funcList next)]
       [(math? (operator lis))        (M-integer lis stateList funcList)]
-      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList)] 
+      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList (lambda (v) v))] 
       [else                          (M-boolean lis stateList funcList next)])))
 
 ;math? - tests if val is a number or math operator, returning #t if it is, #f otherwise.
@@ -227,42 +227,42 @@ Project 2 - Simple Language Interpreter
 
 ;declared? - takes a var name and the stateList, returning #t if var name exists in statelist. ex: (declared? 'x ((x 3))) returns #t.
 (define declared?
-  (lambda (var bigStateList funcList)
+  (lambda (var bigStateList)
     (cond
       ((null? bigStateList)                            #f)
-      ((declaredInside? var (frontState bigStateList) funcList) #t)
-      (else                                            (declared? var (followingStates bigStateList) funcList)))))
+      ((declaredInside? var (frontState bigStateList)) #t)
+      (else                                            (declared? var (followingStates bigStateList))))))
 
 ;delcaredInside? - helper for declared? that dives into deeper states.
 (define declaredInside?
-  (lambda (var stateList funcList)
+  (lambda (var stateList)
     (cond
       ((null?  stateList)                  #f)
       ((equal?(variableDec stateList) var) #t)
-      (else                                (declaredInside? var (followingStates stateList) funcList)))))
+      (else                                (declaredInside? var (followingStates stateList))))))
 
 ;AddBinding - takes a var name and the statelist, creates a new binding with given var.
 (define AddBinding
-  (lambda (var stateList funcList)
-    (if (declared? var stateList funcList)
+  (lambda (var stateList)
+    (if (declared? var stateList)
         (error 'Interpreter "Variable already declared.")
         (cons (cons (list var 'null) (frontState stateList)) (followingStates stateList)))))
 
 ;CheckBinding - takes a var name and statelist, then returns the value of the variable. returns the first instance of said variable
 (define CheckBinding
-  (lambda (var bigStateList funcList)
+  (lambda (var bigStateList)
     (cond
       ((null? bigStateList)                                                         (error 'Interpreter "Variable has not been declared."))
-      ((equal? (frontState (CheckBindingInside var (frontState bigStateList))) var) (innerFollowingStates (CheckBindingInside var (frontState bigStateList) funcList)))
-      (else                                                                         (CheckBinding var (followingStates bigStateList) funcList)))))
+      ((equal? (frontState (CheckBindingInside var (frontState bigStateList))) var) (innerFollowingStates (CheckBindingInside var (frontState bigStateList))))
+      (else                                                                         (CheckBinding var (followingStates bigStateList))))))
 
 ;takes a sub-stateList, and returns the binding of a corresponding variable if it exists. (var varValue)
 (define CheckBindingInside
-  (lambda (var stateList funcList)
+  (lambda (var stateList)
     (cond
       ((null? stateList)                     emptyReturn)
       ((equal? (variableDec stateList) var) (frontState stateList))
-      (else                                 (CheckBindingInside var (followingStates stateList) funcList)))))
+      (else                                 (CheckBindingInside var (followingStates stateList))))))
 
 
 ;ChangeBinding - takes a var name, value, and stateList, then returns the stateList with the new variable's value updated.
@@ -270,7 +270,7 @@ Project 2 - Simple Language Interpreter
   (lambda (var newVal bigStateList funcList)
     (cond
       [(null? bigStateList)                            (error `Interpreter "Variable has not been declared.")]
-      [(declaredInside? var (frontState bigStateList) funcList) (cons (ChangeBindingInside var newVal (frontState bigStateList) funcList) (followingStates bigStateList))]
+      [(declaredInside? var (frontState bigStateList)) (cons (ChangeBindingInside var newVal (frontState bigStateList) funcList) (followingStates bigStateList))]
       [else                                            (cons (frontState bigStateList) (ChangeBinding var newVal (followingStates bigStateList) funcList))])))
 
 ;ChangeBindingInside - helper for ChangeBinding for deeper states.
@@ -332,17 +332,17 @@ Project 2 - Simple Language Interpreter
 
 ;M-integer - checks what kind of operation needs to be performed, returns an integer.
 (define M-integer
-  (lambda (lis stateList funcList next)
+  (lambda (lis stateList funcList)
     (cond
       [(number? lis)                 lis]
       [(not (list? lis))             (CheckBinding lis stateList funcList)]
-      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList next)]
-      [(eq? (operator lis) '+)       (+ (M-integer (leftoperand lis) stateList funcList next) (M-integer (rightoperand lis) stateList funcList next))]
-      [(and (eq? (operator lis) '-)  (null? (value lis))) (- 0 (M-integer (leftoperand lis) stateList funcList next))]
-      [(eq? (operator lis) '-)       (- (M-integer (leftoperand lis) stateList funcList next) (M-integer (rightoperand lis) stateList funcList next))]
-      [(eq? (operator lis) '*)       (* (M-integer (leftoperand lis) stateList funcList next) (M-integer (rightoperand lis) stateList funcList next))]
-      [(eq? (operator lis) '/)       (quotient (M-integer (leftoperand lis) stateList funcList next) (M-integer (rightoperand lis) stateList funcList next))]
-      [(eq? (operator lis) '%)       (remainder (M-integer (leftoperand lis) stateList funcList next) (M-integer (rightoperand lis) stateList funcList next))]
+      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList (lambda (v) v))]
+      [(eq? (operator lis) '+)       (+ (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
+      [(and (eq? (operator lis) '-)  (null? (value lis))) (- 0 (M-integer (leftoperand lis) stateList funcList))]
+      [(eq? (operator lis) '-)       (- (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
+      [(eq? (operator lis) '*)       (* (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
+      [(eq? (operator lis) '/)       (quotient (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
+      [(eq? (operator lis) '%)       (remainder (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
       [else                          (error 'Interpreter "M-integer_Error")])))
 
 ;M-boolean - checks what kind of comparison must be made, returns either #t or #f.
@@ -351,7 +351,7 @@ Project 2 - Simple Language Interpreter
     (cond
       [(eq? lis 'true)          #t]
       [(eq? lis 'false)         #f]
-      [(not (list? lis))        (CheckBinding lis stateList funcList)]
+      [(not (list? lis))        (CheckBinding lis stateList)]
       [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis) stateList funcList next) (M-boolean (rightoperand lis) stateList funcList next))]
       [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis) stateList funcList next) (M-boolean (rightoperand lis) stateList funcList next))]
       [(eq? (operator lis) '!)  (not (M-boolean (leftoperand lis) stateList funcList next))]
@@ -377,6 +377,6 @@ Project 2 - Simple Language Interpreter
       (else                                        (error 'Interpreter "M-return error - Not accounted for")))))
 
 ;END
-(parser "testthis.txt")
+;(parser "testthis.txt")
 (interpret "testthis.txt")
  
