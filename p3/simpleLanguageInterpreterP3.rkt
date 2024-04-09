@@ -134,7 +134,7 @@ Project 2 - Simple Language Interpreter
       [(eq? (command lis) 'break)    (break stateList)]
       [(eq? (command lis) 'continue) (next stateList)]
       
-      [(eq? (command lis) 'function) (M-declareFunction (statement lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))))]
+      [(eq? (command lis) 'function) (M-declareFunction (statement lis) funcList (lambda (f) (next (M-state (nextStatement lis) stateList f next break throw return))))]
       [(eq? (command lis) 'funcall)  (M-funcall (statement lis) (push stateList) (push funcList) (lambda (s) (next (M-state (nextStatement lis) (pop s) (pop funcList) next break throw return))))]
       [else                          (error 'Interpreter "Not a valid command")])))
 
@@ -167,12 +167,10 @@ Project 2 - Simple Language Interpreter
         (error 'Interpreter "Variable not declared. :(")
         (next (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList funcList) stateList funcList)))))
 
-;M-declareFunction - declares a function, binding the function's name, (formal parameters), and ((state) (list)), into one readable lis.
+;M-declareFunction - declares a function, binding the function's name, (formal parameters), and (comamands), into one readable lis.
 (define M-declareFunction
-  (lambda (lis stateList funcList next)
-    (if (null? (value lis))
-        (next (AddFunctionBinding (varValue lis) stateList funcList)) ;declare only
-        (M-assign lis (AddFunctionBinding (varValue lis) stateList funcList) next)))) ;declare and assign
+  (lambda (lis funcList next)
+    (next (AddFunctionBinding (cdr lis) funcList))))
 
 ;M-funcall - handles the calling of a function. Finds if the function's name exists in stateList, and if it does
 #|
@@ -192,7 +190,7 @@ Project 2 - Simple Language Interpreter
 |#
 (define M-funcall
   (lambda (lis stateList funcList next)
-      (next (M-state (commandList (CheckFunctionBinding (leftOperand lis) funcList)) (parametize (paramList (CheckFunctionBinding (leftOperand lis) funcList)) (rightOperand lis)) funcList initialNext initialBreak initialThrow initialReturn))))
+    `(next (M-state (commandList (CheckFunctionBinding (leftOperand lis) funcList)) (parametize (paramList (CheckFunctionBinding (leftOperand lis) funcList)) (rightOperand lis)) funcList initialNext initialBreak initialThrow initialReturn))))
       
 
 (define parametize
@@ -290,26 +288,26 @@ Project 2 - Simple Language Interpreter
 
 ;declaredFunction? - takes a var name and the stateList, returning #t if var name exists in statelist. ex: (declared? 'x ((x 3))) returns #t.
 (define declaredFunction?
-  (lambda (var bigStateList)
+  (lambda (func bigFuncList)
     (cond
-      ((null? bigStateList)                            #f)
-      ((declaredFunctionInside? var (frontState bigStateList)) #t)
-      (else                                            (declared? var (followingStates bigStateList))))))
+      ((null? bigFuncList)                            #f)
+      ((declaredFunctionInside? func (frontState bigFuncList)) #t)
+      (else                                            (declared? func (followingStates funcList))))))
 
 ;declaredFunctionInside? - helper for declared? that dives into deeper states.
 (define declaredFunctionInside?
-  (lambda (var stateList)
+  (lambda (var funcList)
     (cond
-      ((null?  stateList)                  #f)
-      ((equal?(variableDec stateList) var) #t)
-      (else                                (declaredFunctionInside? var (followingStates stateList))))))
+      ((null?  funcList)                  #f)
+      ((equal?(variableDec funcList) func) #t)
+      (else                                (declaredFunctionInside? func (followingStates funcList))))))
 
 ;AddFunctionBinding - takes a var name and the statelist, creates a new binding with given var.
 (define AddFunctionBinding
-  (lambda (var stateList)
-    (if (declared? var stateList)
-        (error 'Interpreter "Variable already declared.")
-        (cons (cons (list var 'null) (frontState stateList)) (followingStates stateList)))))
+  (lambda (func funcList)
+    (if (declaredFunction? func funcList)
+        (error 'Interpreter "Function already declared.")
+        (cons (cons func (frontState funcList)) (followingStates funcList)))))
 
 ;CheckFunctionBinding - takes a var name and statelist, then returns the value of the variable. returns the first instance of said variable
 (define CheckFunctionBinding
