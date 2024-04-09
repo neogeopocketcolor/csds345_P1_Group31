@@ -190,11 +190,13 @@ Project 2 - Simple Language Interpreter
 |#
 (define M-funcall
   (lambda (lis stateList funcList next)
-    (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (rightoperand lis)) funcList initialNext initialBreak initialThrow initialReturn))))
+    (call/cc
+     (lambda (initialReturn)
+       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (rightoperand lis) funcList next) funcList initialNext initialBreak initialThrow initialReturn))))))
       
 
 (define parametize
-  (lambda (formal actual stateList)
+  (lambda (formal actual stateList funcList next)
     (if (null? formal) stateList
         (parametize (cdr formal) (cdr actual) (M-declare (cons 'var (list (car formal) (M-expression (car actual) funcList next))))))))
 
@@ -293,15 +295,15 @@ Project 2 - Simple Language Interpreter
     (cond
       ((null? bigFuncList)                            #f)
       ((declaredFunctionInside? func (frontState bigFuncList)) #t)
-      (else                                            (declared? func (followingStates funcList))))))
+      (else                                            (declared? func (followingStates bigFuncList))))))
 
 ;declaredFunctionInside? - helper for declared? that dives into deeper states.
 (define declaredFunctionInside?
   (lambda (var funcList)
     (cond
       ((null?  funcList)                  #f)
-      ((equal?(variableDec funcList) func) #t)
-      (else                                (declaredFunctionInside? func (followingStates funcList))))))
+      ((equal?(variableDec funcList) funcList) #t)
+      (else                                (declaredFunctionInside? funcList (followingStates funcList))))))
 
 ;AddFunctionBinding - takes a var name and the statelist, creates a new binding with given var.
 (define AddFunctionBinding
@@ -332,17 +334,18 @@ Project 2 - Simple Language Interpreter
 
 ;M-integer - checks what kind of operation needs to be performed, returns an integer.
 (define M-integer
-  (lambda (lis stateList funcList)
+  (lambda (lis stateList funcList next)
     (cond
       [(number? lis)                 lis]
-      [(not (list? lis))            (CheckBinding lis stateList funcList)]
-      [(eq? (operator lis) '+)      (+ (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
-      [(and (eq? (operator lis) '-) (null? (value lis))) (- 0 (M-integer (leftoperand lis) stateList funcList))]
-      [(eq? (operator lis) '-)      (- (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
-      [(eq? (operator lis) '*)      (* (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
-      [(eq? (operator lis) '/)      (quotient (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
-      [(eq? (operator lis) '%)      (remainder (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
-      [else                         (error 'Interpreter "M-integer_Error")])))
+      [(not (list? lis))             (CheckBinding lis stateList funcList)]
+      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList next)]
+      [(eq? (operator lis) '+)       (+ (M-integer (leftoperand lis) stateList funcList next) (M-integer (rightoperand lis) stateList funcList next))]
+      [(and (eq? (operator lis) '-)  (null? (value lis))) (- 0 (M-integer (leftoperand lis) stateList funcList next))]
+      [(eq? (operator lis) '-)       (- (M-integer (leftoperand lis) stateList funcList next) (M-integer (rightoperand lis) stateList funcList next))]
+      [(eq? (operator lis) '*)       (* (M-integer (leftoperand lis) stateList funcList next) (M-integer (rightoperand lis) stateList funcList next))]
+      [(eq? (operator lis) '/)       (quotient (M-integer (leftoperand lis) stateList funcList next) (M-integer (rightoperand lis) stateList funcList next))]
+      [(eq? (operator lis) '%)       (remainder (M-integer (leftoperand lis) stateList funcList next) (M-integer (rightoperand lis) stateList funcList next))]
+      [else                          (error 'Interpreter "M-integer_Error")])))
 
 ;M-boolean - checks what kind of comparison must be made, returns either #t or #f.
 (define M-boolean
