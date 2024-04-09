@@ -77,17 +77,15 @@ Project 2 - Simple Language Interpreter
      (lambda (initialReturn)
        (M-state (parser filename) initialState initialNext initialBreak initialThrow initialReturn)))))
 
-;M-state-first - First run of M-state that stores functions and variables, allows variables to be set, and that's it. Throw everything else.
-(define M-state-first
-  (lambda (lis stateList next break throw return)
-    (cond
-      [(null? lis) stateList]
-      [(eq? (command lis) '=)        (M-assign (statement lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))))]
-      [(eq? (command lis) 'var)      (M-declare (statement lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))))]
-      [(eq? (command lis) 'function) "how we will evaluate functions"]
-      [(eq? (command lis) 'funcall)  "how we call functions"]
-      [else                          (error 'Interpreter "Unallowed operation outside of functions")]
-      )))
+#|
+- Assumedly we’d want to go through the parsed code once first to store global variables.
+    - Global variables can be set by functions declared before they’re called (Test 5)
+    - Otherwise it’s *just* variable and function declaring. Parser throws error if anything else is tried.
+    - Maybe have an M-state that goes thru
+        - 1. Right when the (interpret) command is called
+        - 2. Every time a new function is called
+    - and stores the functions of an env before doing anything else?
+|#
       
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
@@ -120,15 +118,9 @@ Project 2 - Simple Language Interpreter
                                               (lambda (s) (next (pop s))) throw return)] ;return popped state
       [(eq? (command lis) 'break)    (break stateList)]
       [(eq? (command lis) 'continue) (next stateList)]
-      [(eq? (command lis) 'function) "how we will evaluate functions"]
+      [(eq? (command lis) 'function) (M-declareFunction (statement lis) stateList (lambda (s) (next (M-state (nextStatement lis) s next break throw return))))]
       [(eq? (command lis) 'funcall) "how we call functions"]
       [else                          (error 'Interpreter "Not a valid command")])))
-
-;
-;; Function-Related Functions
-;
-
-
 
 
 ;
@@ -150,6 +142,7 @@ Project 2 - Simple Language Interpreter
     (if (null? (value lis))
         (next (AddBinding (varValue lis) stateList)) ;declare only
         (M-assign lis (AddBinding (varValue lis) stateList) next)))) ;declare and assign
+
         
 ;M-assign - assigns a binding to a variable if the variable doesn't already have a value.
 (define M-assign 
@@ -157,6 +150,33 @@ Project 2 - Simple Language Interpreter
     (if (not (declared? (leftoperand lis) stateList))
         (error 'Interpreter "Variable not declared. :(")
         (next (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList) stateList)))))
+
+;M-declareFunction - declares a function, binding the function's name, (formal parameters), and ((state) (list)), into one readable lis.
+(define M-declareFunction
+  (lambda (lis stateList next)
+    (if (null? (value lis))
+        (next (AddFunctionBinding (varValue lis) stateList)) ;declare only
+        (M-assign lis (AddFunctionBinding (varValue lis) stateList) next)))) ;declare and assign
+
+;M-funcall - handles the calling of a function. Finds if the function's name exists in stateList, and if it does
+#|
+    - Calls are translated as such:
+        - name(param1 param2) <— java-esque call
+        - (funcall name param1 param2) <— parser’s storage
+    - So suppose functions are stored like
+        - { [ (name) (param1 param2) (function’s body) ] }
+        - {} being the list the current env’s functions are stored
+        - [] being the list that stores a single function
+    - So when funcall occurs,
+        - 1. Check for the name (car of the list) in every current env’s function list
+        - 2. If it exists, somehow step into the env and declare the parameters
+            -  Take param1 from the storage, and declare that as a new variable with the value of the input value (cadr of funcall)
+            - If lengths of param lists don’t match, throw error
+        - 3. Call M-state on the first command of the list and just go from there as you would w/ a try/catch.
+        - The main problem is finding a way to sneak in the variable declarations
+|#
+
+
        
 ;M-expression - checks if an operation needs to return a number (math equation) or a boolean (t/f).
 (define M-expression
