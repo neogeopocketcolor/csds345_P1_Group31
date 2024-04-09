@@ -80,7 +80,7 @@ Project 2 - Simple Language Interpreter
   (lambda (filename)
     (call/cc
      (lambda (initialReturn)
-       (M-state (parser filename) initialState initialFunc initialNext initialBreak initialThrow initialReturn)))))
+       (M-state (parser filename) initialState initialFunc (lambda (s f) (M-funcall (list 'funcall 'main) s f initialNext)) initialBreak initialThrow initialReturn)))))
 
 #|
 - Assumedly we’d want to go through the parsed code once first to store global variables.
@@ -96,7 +96,7 @@ Project 2 - Simple Language Interpreter
 (define M-state
   (lambda (lis stateList funcList next break throw return)
     (cond
-      [(null? lis) stateList]
+      [(null? lis) (next stateList funcList)]
       [(eq? (command lis) '=)        (M-assign (statement lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return))))]
       [(eq? (command lis) 'var)      (M-declare (statement lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return))))]
       
