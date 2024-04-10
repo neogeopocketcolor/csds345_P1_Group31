@@ -193,7 +193,7 @@ Project 3 - Imperitive Language Interpreter
     (cond
       [(and (null? formal) (not (null? actual))) (error 'Interpreter "Formal paremeters does not match number of actual paremeters.")]
       [(null? formal) (frontState stateList)]
-      [else (parametize (cdr formal) (parametizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) stateList funcList next))) stateList funcList next) funcList next)])))
+      [else (parametize (cdr formal) (parametizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) (followingStates stateList) funcList next))) stateList funcList next) funcList next)])))
 
 (define parametizeCheckCdr
   (lambda (val)
