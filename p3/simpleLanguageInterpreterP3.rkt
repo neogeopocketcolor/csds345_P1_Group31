@@ -131,6 +131,11 @@ Project 3 - Imperitive Language Interpreter
 ;; General Use
 ;
 
+(define findGlobal
+  (lambda (stateList)
+    (if (null? (followingStates stateList)) (frontState stateList)
+        (findGlobal (followingStates stateList)))))
+
 ;Helper function for loops
 (define loop
   (lambda (condition body stateList funcList next break throw return)
@@ -180,14 +185,14 @@ Project 3 - Imperitive Language Interpreter
   (lambda (lis stateList funcList next)
     (call/cc
      (lambda (initialReturn)
-       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) (push stateList) (push funcList) next) funcList initialNext initialBreak initialThrow initialReturn) funcList)))))
+       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) (list (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) stateList funcList next) (findGlobal stateList)) (push (list (findGlobal funcList))) initialNext initialBreak initialThrow initialReturn) funcList)))))
       ; ^^^ changed this to have push statelist/funclist as formal params can appear as declared variables in the same env. May fuck stuff up, works currently.
 
 (define parametize
   (lambda (formal actual stateList funcList next)
     (cond
       [(and (null? formal) (not (null? actual))) (error 'Interpreter "Formal paremeters does not match number of actual paremeters.")]
-      [(null? formal) stateList]
+      [(null? formal) (frontState stateList)]
       [else (parametize (cdr formal) (parametizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) stateList funcList next))) stateList funcList next) funcList next)])))
 
 (define parametizeCheckCdr
@@ -212,7 +217,7 @@ Project 3 - Imperitive Language Interpreter
                                      (M-boolean lis stateList funcList next))]
       [(declared? lis stateList)     (M-expression (CheckBinding lis stateList funcList) stateList funcList next)]
       [(math? (operator lis))        (M-integer lis stateList funcList)]
-      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList (lambda (v f) v))] 
+      [(eq? (operator lis) 'funcall) (M-funcall lis (push stateList) (push funcList) (lambda (v f) v))] 
       [else                          (M-boolean lis stateList funcList next)])))
 
 ;math? - tests if val is a number or math operator, returning #t if it is, #f otherwise.
@@ -342,7 +347,7 @@ Project 3 - Imperitive Language Interpreter
     (cond
       [(number? lis)                 lis]
       [(not (list? lis))             (CheckBinding lis stateList)]
-      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList (lambda (v f) v))]
+      [(eq? (operator lis) 'funcall) (M-funcall lis (push stateList) (push funcList) (lambda (v f) v))]
       [(eq? (operator lis) '+)       (+ (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
       [(and (eq? (operator lis) '-)  (null? (value lis))) (- 0 (M-integer (leftoperand lis) stateList funcList))]
       [(eq? (operator lis) '-)       (- (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
@@ -358,7 +363,7 @@ Project 3 - Imperitive Language Interpreter
       [(or (eq? lis 'true) (eq? lis #t))          #t]
       [(or (eq? lis 'false) (eq? lis #f))         #f]
       [(not (list? lis))        (CheckBinding lis stateList)]
-      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList (lambda (v f) v))]
+      [(eq? (operator lis) 'funcall) (M-funcall lis (push stateList) (push funcList) (lambda (v f) v))]
       [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis) stateList funcList next) (M-boolean (rightoperand lis) stateList funcList next))]
       [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis) stateList funcList next) (M-boolean (rightoperand lis) stateList funcList next))]
       [(eq? (operator lis) '!)  (not (M-boolean (leftoperand lis) stateList funcList next))]
