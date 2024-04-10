@@ -1,28 +1,29 @@
-function f(n) {
-  var a;
-  var b;
-  var c;
-
-  a = 2 * n;
-  b = n - 10;
-
-  function g(x) {
-    var a;
-    a = x + 1;
-    b = 100;
-    return a;
+function min(x, y, z) {
+  if (x < y) {
+    if (x < z)
+      return x;
+    else if (z < x)
+      return z;
   }
-
-  if (b == 0)
-    c = g(a);
+  else if (y > z)
+    return z;
   else
-    c = a / b;
-  return a + b + c;
+    return y;
 }
 
-function main() {
-  var x = f(10);
-  var y = f(20);
+var x = 10;
+var y = 20;
+var z = 30;
 
-  return x - y;
+var min1 = min(x,y,z);
+var min2 = min(z,y,x);
+
+function main() {
+  var min3 = min(y,z,x);
+
+  if (min1 == min3)
+    if (min1 == min2)
+      if (min2 == min3)
+        return 1;
+  return 0;
 }

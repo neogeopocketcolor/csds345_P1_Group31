@@ -81,16 +81,6 @@ Project 3 - Imperitive Language Interpreter
     (call/cc
      (lambda (initialReturn)
        (M-state (parser filename) initialState initialFunc (lambda (s f) (initialReturn (M-funcall '(funcall main) (push s) (push f) initialNext))) initialBreak initialThrow initialReturn)))))
-
-#|
-- Assumedly we’d want to go through the parsed code once first to store global variables.
-    - Global variables can be set by functions declared before they’re called (Test 5)
-    - Otherwise it’s *just* variable and function declaring. Parser throws error if anything else is tried.
-    - Maybe have an M-state that goes thru
-        - 1. Right when the (interpret) command is called
-        - 2. Every time a new function is called
-    - and stores the functions of an env before doing anything else?
-|#
   
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
@@ -110,7 +100,7 @@ Project 3 - Imperitive Language Interpreter
                                            (lambda (s f) (break (M-state (nextStatement lis) s funcList next break throw return))) throw return)]
       [(eq? (command lis) 'return)   (return (M-return (statement lis) stateList funcList next))]
       
-      [(eq? (command lis) 'begin)    (M-state (beginBody lis) (push stateList) (push funcList) (lambda (s f) (next (M-state (nextStatement lis) (pop s) (pop f) next break throw return) f)) ; push/pop funclist?
+      [(eq? (command lis) 'begin)    (M-state (beginBody lis) (push stateList) (push funcList) (lambda (s f) (next (M-state (nextStatement lis) (pop s) (pop f) next break throw return) f)) ; something here makes the stateList the return function
                                            (lambda (s f) (call/cc (lambda k (break (M-state (nextStatement lis) (pop s) (pop funcList) next k throw return))))) throw return)]
       
       [(eq? (command lis) 'try)      (M-state (lisBeginning (beginBody lis)) (push stateList) (push funcList) (lambda (s1) (if (null? (finallyPoint (finallyShortcut lis))) (next (M-state (nextStatement lis) (pop s1) funcList next break throw return))
@@ -133,7 +123,7 @@ Project 3 - Imperitive Language Interpreter
       [(eq? (command lis) 'continue) (next stateList)]
       
       [(eq? (command lis) 'function) (M-declareFunction (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) stateList f next break throw return) funcList)))]
-      [(eq? (command lis) 'funcall)  (M-funcall (statement lis) (push stateList) (push funcList) (lambda (s) (next (M-state (nextStatement lis) (pop s) (pop funcList) next break throw return))))]
+      [(eq? (command lis) 'funcall)  (M-funcall (statement lis) (push stateList) (push funcList) (lambda (s f) (next (M-state (nextStatement lis) (pop s) (pop f) next break throw return))))]
       [else                          (error 'Interpreter "Not a valid command")])))
 
 
@@ -261,15 +251,6 @@ Project 3 - Imperitive Language Interpreter
 (define AddBinding
   (lambda (var stateList)
     (if (declaredInside? var (frontState stateList))
-        ;
-        ;
-        ;
-        ;
-        ;
-        ;
-        ;
-        ;
-        ;
         (error 'Interpreter "Variable already declared.")
         (cons (cons (list var 'null) (frontState stateList)) (followingStates stateList)))))
 
@@ -374,9 +355,10 @@ Project 3 - Imperitive Language Interpreter
 (define M-boolean
   (lambda (lis stateList funcList next)
     (cond
-      [(eq? lis 'true)          #t]
-      [(eq? lis 'false)         #f]
+      [(or (eq? lis 'true) (eq? lis #t))          #t]
+      [(or (eq? lis 'false) (eq? lis #f))         #f]
       [(not (list? lis))        (CheckBinding lis stateList)]
+      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList (lambda (v f) v))]
       [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis) stateList funcList next) (M-boolean (rightoperand lis) stateList funcList next))]
       [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis) stateList funcList next) (M-boolean (rightoperand lis) stateList funcList next))]
       [(eq? (operator lis) '!)  (not (M-boolean (leftoperand lis) stateList funcList next))]
@@ -395,8 +377,8 @@ Project 3 - Imperitive Language Interpreter
     (cond
       ((null? statement)                           (error 'Interpreter "M-return error - Null statement somehow"))
       ((number? (returnVal statement))             (returnVal statement))
-      ((eq? #t (returnVal statement))              'true)
-      ((eq? #f (returnVal statement))              'false)
+      ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement))) 'true)
+      ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement))) 'false)
       ((pair? (returnVal statement))               (M-return (returnify (M-expression (returnVal statement) stateList funcList initialNext)) stateList funcList next)) ;if an expression, call m-expression
       ((declared? (returnVal statement) stateList) (M-return (returnify (CheckBinding (returnVal statement) stateList)) stateList funcList next)) ;check if statement is a declared variable, if so return the value.
       (else                                        (error 'Interpreter "M-return error - Not accounted for")))))
