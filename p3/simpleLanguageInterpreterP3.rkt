@@ -80,7 +80,7 @@ Project 3 - Imperitive Language Interpreter
   (lambda (filename)
     (call/cc
      (lambda (initialReturn)
-       (M-state (parser filename) initialState initialFunc (lambda (s f) (initialReturn (M-funcall '(funcall main ()) (push s) (push f) initialNext))) initialBreak initialThrow initialReturn)))))
+       (M-state (parser filename) initialState initialFunc (lambda (s f) (initialReturn (M-funcall '(funcall main) (push s) (push f) initialNext))) initialBreak initialThrow initialReturn)))))
 
 #|
 - Assumedly we’d want to go through the parsed code once first to store global variables.
@@ -110,7 +110,7 @@ Project 3 - Imperitive Language Interpreter
                                            (lambda (s f) (break (M-state (nextStatement lis) s funcList next break throw return))) throw return)]
       [(eq? (command lis) 'return)   (return (M-return (statement lis) stateList funcList next))]
       
-      [(eq? (command lis) 'begin)    (M-state (beginBody lis) (push stateList) (push funcList) (lambda (s f) (next (M-state (nextStatement lis) (pop s) (pop funcList) next break throw return))) ; push/pop funclist?
+      [(eq? (command lis) 'begin)    (M-state (beginBody lis) (push stateList) (push funcList) (lambda (s f) (next (M-state (nextStatement lis) (pop s) (pop f) next break throw return) f)) ; push/pop funclist?
                                            (lambda (s f) (call/cc (lambda k (break (M-state (nextStatement lis) (pop s) (pop funcList) next k throw return))))) throw return)]
       
       [(eq? (command lis) 'try)      (M-state (lisBeginning (beginBody lis)) (push stateList) (push funcList) (lambda (s1) (if (null? (finallyPoint (finallyShortcut lis))) (next (M-state (nextStatement lis) (pop s1) funcList next break throw return))
@@ -190,14 +190,15 @@ Project 3 - Imperitive Language Interpreter
   (lambda (lis stateList funcList next)
     (call/cc
      (lambda (initialReturn)
-       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (rightoperand lis) (push stateList) (push funcList) next) funcList initialNext initialBreak initialThrow initialReturn))))))
+       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) (push stateList) (push funcList) next) funcList initialNext initialBreak initialThrow initialReturn) funcList)))))
       ; ^^^ changed this to have push statelist/funclist as formal params can appear as declared variables in the same env. May fuck stuff up, works currently.
 
 (define parametize
   (lambda (formal actual stateList funcList next)
-    (if (null? formal)
-        stateList
-        (parametize (cdr formal) (parametizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) stateList funcList next))) stateList funcList next) funcList next))))
+    (cond
+      [(and (null? formal) (not (null? actual))) (error 'Interpreter "Formal paremeters does not match number of actual paremeters.")]
+      [(null? formal) stateList]
+      [else (parametize (cdr formal) (parametizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) stateList funcList next))) stateList funcList next) funcList next)])))
 
 (define parametizeCheckCdr
   (lambda (val)
@@ -207,7 +208,7 @@ Project 3 - Imperitive Language Interpreter
 
 (define parametizeCheckCar
   (lambda (val)
-    (if (and (list? val) (number? (car val)))
+    (if (list? val)
         (car val)
         val)))
 
@@ -259,7 +260,7 @@ Project 3 - Imperitive Language Interpreter
 ;AddBinding - takes a var name and the statelist, creates a new binding with given var.
 (define AddBinding
   (lambda (var stateList)
-    (if (declared? var stateList)
+    (if (declaredInside? var (frontState stateList))
         ;
         ;
         ;
