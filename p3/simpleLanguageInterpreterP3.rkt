@@ -5,9 +5,9 @@
 
 Alex Seidman - Avry Rechel
 ads206 - ajr250
-3/26/2024
+4/10/2024
 CSDS 345
-Project 2 - Simple Language Interpreter
+Project 3 - Imperitive Language Interpreter
 
 |#
 
@@ -106,18 +106,18 @@ Project 2 - Simple Language Interpreter
                                              (M-state (statement2 lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return) f)) break throw return)
                                              (next (M-state (nextStatement lis) stateList funcList next break throw return) funcList)))]
       
-      [(eq? (command lis) 'while)    (loop (condition lis) (body lis) stateList funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return) funcList))
-                                           (lambda (s) (break (M-state (nextStatement lis) s funcList next break throw return))) throw return)]
+      [(eq? (command lis) 'while)    (loop (condition lis) (body lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s funcList next break throw return) funcList))
+                                           (lambda (s f) (break (M-state (nextStatement lis) s funcList next break throw return))) throw return)]
       [(eq? (command lis) 'return)   (return (M-return (statement lis) stateList funcList next))]
       
-      [(eq? (command lis) 'begin)    (M-state (beginBody lis) (push stateList) (push funcList) (lambda (s) (next (M-state (nextStatement lis) (pop s) (pop funcList) next break throw return))) ; push/pop funclist?
-                                           (lambda (s) (call/cc (lambda k (break (M-state (nextStatement lis) (pop s) (pop funcList) next k throw return))))) throw return)]
+      [(eq? (command lis) 'begin)    (M-state (beginBody lis) (push stateList) (push funcList) (lambda (s f) (next (M-state (nextStatement lis) (pop s) (pop funcList) next break throw return))) ; push/pop funclist?
+                                           (lambda (s f) (call/cc (lambda k (break (M-state (nextStatement lis) (pop s) (pop funcList) next k throw return))))) throw return)]
       
       [(eq? (command lis) 'try)      (M-state (lisBeginning (beginBody lis)) (push stateList) (push funcList) (lambda (s1) (if (null? (finallyPoint (finallyShortcut lis))) (next (M-state (nextStatement lis) (pop s1) funcList next break throw return))
                                                                                                       ;CHECK OUT THIS COMMENT YAYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY ^^^^^^^^ funcList remains? or pop this too
                                                                                                       (next (M-state (finallyShortcut lis) s1 funcList (lambda (s) (M-state (nextStatement lis) s funcList next break throw return)) break throw return)))) ;next, go to finally
                                               (lambda (s1) (M-state (finallyShortcut lis) s1 funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return))) break throw return)) ;if broken, go to finally
-                                              (lambda (e s) (M-state (catchShortcut lis) (ChangeBinding (innerState (beginBody (catchShortcut lis))) e (AddBinding (innerState (beginBody (catchShortcut lis))) s funcList) funcList) ;if exception is thrown, go to catch
+                                              (lambda (e s f) (M-state (catchShortcut lis) (ChangeBinding (innerState (beginBody (catchShortcut lis))) e (AddBinding (innerState (beginBody (catchShortcut lis))) s funcList) funcList) ;if exception is thrown, go to catch
                                                                      (lambda (s1) (if (null? (finallyPoint (finallyShortcut lis))) (M-state (nextStatement lis) (pop s1) funcList next break throw return)
                                                                                       ;; THIS ONE TOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO ^^^^^^^^ pop this?
                                                                                       (M-state (finallyShortcut lis) s1 funcList (lambda (s2) (M-state (nextStatement lis) s2 funcList next break throw return)) break throw return)));catch's next statement is finally
@@ -146,9 +146,9 @@ Project 2 - Simple Language Interpreter
   (lambda (condition body stateList funcList next break throw return)
     (if (M-boolean condition stateList funcList next)
         (M-state body stateList funcList
-                 (lambda (s) (loop condition body s funcList next break throw return))
+                 (lambda (s f) (loop condition body s funcList next break throw return))
                  break throw return)
-        (next stateList))))
+        (next stateList funcList))))
 
 ;M-declare - declares a variable, either with or without a binding to a value.
 (define M-declare
@@ -190,23 +190,38 @@ Project 2 - Simple Language Interpreter
   (lambda (lis stateList funcList next)
     (call/cc
      (lambda (initialReturn)
-       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (rightoperand lis) stateList funcList next) funcList initialNext initialBreak initialThrow initialReturn))))))
-      
+       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (rightoperand lis) (push stateList) (push funcList) next) funcList initialNext initialBreak initialThrow initialReturn))))))
+      ; ^^^ changed this to have push statelist/funclist as formal params can appear as declared variables in the same env. May fuck stuff up, works currently.
 
 (define parametize
   (lambda (formal actual stateList funcList next)
-    (if (null? formal) stateList
-        (parametize (cdr formal) (cdr actual) (M-declare (cons 'var (list (car formal) (M-expression (car actual) funcList next))))))))
+    (if (null? formal)
+        stateList
+        (parametize (cdr formal) (parametizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) stateList funcList next))) stateList funcList next) funcList next))))
+
+(define parametizeCheckCdr
+  (lambda (val)
+    (if (list? val)
+        (cdr val)
+        val)))
+
+(define parametizeCheckCar
+  (lambda (val)
+    (if (and (list? val) (number? (car val)))
+        (car val)
+        val)))
+
 
 ;M-expression - checks if an operation needs to return a number (math equation) or a boolean (t/f).
 (define M-expression
   (lambda (lis stateList funcList next)
     (cond
       [(not (list? lis)) (if (math? lis)
-                                     (M-integer lis stateList funcList)(M-boolean lis stateList funcList next))]
+                                     (M-integer lis stateList funcList)
+                                     (M-boolean lis stateList funcList next))]
       [(declared? lis stateList)     (M-expression (CheckBinding lis stateList funcList) stateList funcList next)]
       [(math? (operator lis))        (M-integer lis stateList funcList)]
-      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList (lambda (v) v))] 
+      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList (lambda (v f) v))] 
       [else                          (M-boolean lis stateList funcList next)])))
 
 ;math? - tests if val is a number or math operator, returning #t if it is, #f otherwise.
@@ -245,6 +260,15 @@ Project 2 - Simple Language Interpreter
 (define AddBinding
   (lambda (var stateList)
     (if (declared? var stateList)
+        ;
+        ;
+        ;
+        ;
+        ;
+        ;
+        ;
+        ;
+        ;
         (error 'Interpreter "Variable already declared.")
         (cons (cons (list var 'null) (frontState stateList)) (followingStates stateList)))))
 
@@ -256,7 +280,7 @@ Project 2 - Simple Language Interpreter
       ((equal? (frontState (CheckBindingInside var (frontState bigStateList))) var) (innerFollowingStates (CheckBindingInside var (frontState bigStateList))))
       (else                                                                         (CheckBinding var (followingStates bigStateList))))))
 
-;takes a sub-stateList, and returns the binding of a corresponding variable if it exists. (var varValue)
+;CheckBindingInside - takes a sub-stateList, and returns the binding of a corresponding variable if it exists. (var varValue)
 (define CheckBindingInside
   (lambda (var stateList)
     (cond
@@ -336,7 +360,7 @@ Project 2 - Simple Language Interpreter
     (cond
       [(number? lis)                 lis]
       [(not (list? lis))             (CheckBinding lis stateList)]
-      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList (lambda (v) v))]
+      [(eq? (operator lis) 'funcall) (M-funcall lis stateList funcList (lambda (v f) v))]
       [(eq? (operator lis) '+)       (+ (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
       [(and (eq? (operator lis) '-)  (null? (value lis))) (- 0 (M-integer (leftoperand lis) stateList funcList))]
       [(eq? (operator lis) '-)       (- (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
@@ -372,7 +396,7 @@ Project 2 - Simple Language Interpreter
       ((number? (returnVal statement))             (returnVal statement))
       ((eq? #t (returnVal statement))              'true)
       ((eq? #f (returnVal statement))              'false)
-      ((pair? (returnVal statement))               (M-return (returnify (M-expression (returnVal statement) stateList funcList initialNext)) stateList)) ;if an expression, call m-expression
+      ((pair? (returnVal statement))               (M-return (returnify (M-expression (returnVal statement) stateList funcList initialNext)) stateList funcList next)) ;if an expression, call m-expression
       ((declared? (returnVal statement) stateList) (M-return (returnify (CheckBinding (returnVal statement) stateList)) stateList funcList next)) ;check if statement is a declared variable, if so return the value.
       (else                                        (error 'Interpreter "M-return error - Not accounted for")))))
 
