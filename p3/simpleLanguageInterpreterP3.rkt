@@ -11,9 +11,9 @@ Project 3 - Imperitive Language Interpreter
 
 |#
 
-;;
-;;;Abstractions
-;;
+;;=====================================
+;;Abstractions
+;;=====================================
 
 ;misc
 (define command caar)
@@ -71,9 +71,22 @@ Project 3 - Imperitive Language Interpreter
 (define paramList car)
 (define commandList cadr)
 
-;;
-;;;Proper Functions
-;;
+;parametrizing
+(define parametizeCheckCdr
+  (lambda (val)
+    (if (list? val)
+        (cdr val)
+        val)))
+
+(define parametizeCheckCar
+  (lambda (val)
+    (if (list? val)
+        (car val)
+        val)))
+
+;;=====================================
+;;Proper Functions
+;;=====================================
 
 ;interpret command - required, parses the input file and executes the code.
 (define interpret
@@ -104,12 +117,10 @@ Project 3 - Imperitive Language Interpreter
                                            (lambda (s f) (call/cc (lambda k (break (M-state (nextStatement lis) (pop s) (pop funcList) next k throw return))))) throw return)]
       
       [(eq? (command lis) 'try)      (M-state (lisBeginning (beginBody lis)) (push stateList) (push funcList) (lambda (s1) (if (null? (finallyPoint (finallyShortcut lis))) (next (M-state (nextStatement lis) (pop s1) funcList next break throw return))
-                                                                                                      ;CHECK OUT THIS COMMENT YAYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY ^^^^^^^^ funcList remains? or pop this too
                                                                                                       (next (M-state (finallyShortcut lis) s1 funcList (lambda (s) (M-state (nextStatement lis) s funcList next break throw return)) break throw return)))) ;next, go to finally
                                               (lambda (s1) (M-state (finallyShortcut lis) s1 funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return))) break throw return)) ;if broken, go to finally
                                               (lambda (e s f) (M-state (catchShortcut lis) (ChangeBinding (innerState (beginBody (catchShortcut lis))) e (AddBinding (innerState (beginBody (catchShortcut lis))) s funcList) funcList) ;if exception is thrown, go to catch
                                                                      (lambda (s1) (if (null? (finallyPoint (finallyShortcut lis))) (M-state (nextStatement lis) (pop s1) funcList next break throw return)
-                                                                                      ;; THIS ONE TOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO ^^^^^^^^ pop this?
                                                                                       (M-state (finallyShortcut lis) s1 funcList (lambda (s2) (M-state (nextStatement lis) s2 funcList next break throw return)) break throw return)));catch's next statement is finally
                                                                      break throw return)) return)] ;catch's break statement is finally
       
@@ -127,9 +138,9 @@ Project 3 - Imperitive Language Interpreter
       [else                          (error 'Interpreter "Not a valid command")])))
 
 
-;
+;;=====================================
 ;; General Use
-;
+;;=====================================
 
 (define findGlobal
   (lambda (stateList)
@@ -166,47 +177,23 @@ Project 3 - Imperitive Language Interpreter
     (next stateList (AddFunctionBinding (cdr lis) funcList))))
 
 ;M-funcall - handles the calling of a function. Finds if the function's name exists in stateList, and if it does
-#|
-    - Calls are translated as such:
-        - name(param1 param2) <— java-esque call
-        - (funcall name param1 param2) <— parser’s storage
-    - So suppose functions are stored like
-        - { [ (name) (param1 param2) (function’s body) ] }
-        - {} being the list the current env’s functions are stored
-        - [] being the list that stores a single function
-    - So when funcall occurs,
-        - 1. Check for the name (car of the list) in every current env’s function list
-        - 2. If it exists, somehow step into the env and declare the parameters
-            -  Take param1 from the storage, and declare that as a new variable with the value of the input value (cadr of funcall)
-            - If lengths of param lists don’t match, throw error
-        - 3. Call M-state on the first command of the list and just go from there as you would w/ a try/catch.
-|#
 (define M-funcall
   (lambda (lis stateList funcList next)
     (call/cc
      (lambda (initialReturn)
-       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) (list (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) stateList funcList next) (findGlobal stateList)) (push (list (findGlobal funcList))) initialNext initialBreak initialThrow initialReturn) funcList)))))
-      ; ^^^ changed this to have push statelist/funclist as formal params can appear as declared variables in the same env. May fuck stuff up, works currently.
+       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList))
+                      (list (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) stateList funcList next) (findGlobal stateList))
+                      (push (list (findGlobal funcList)))
+                      initialNext initialBreak initialThrow initialReturn)
+             funcList)))))
 
+;parametize - takes list of formal and actual parameters and declares the formal parameters accordingly to the proper environment
 (define parametize
   (lambda (formal actual stateList funcList next)
     (cond
       [(and (null? formal) (not (null? actual))) (error 'Interpreter "Formal paremeters does not match number of actual paremeters.")]
-      [(null? formal) (frontState stateList)]
-      [else (parametize (cdr formal) (parametizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) (followingStates stateList) funcList next))) stateList funcList next) funcList next)])))
-
-(define parametizeCheckCdr
-  (lambda (val)
-    (if (list? val)
-        (cdr val)
-        val)))
-
-(define parametizeCheckCar
-  (lambda (val)
-    (if (list? val)
-        (car val)
-        val)))
-
+      [(null? formal)                            (frontState stateList)]
+      [else (parametize (cdr formal)             (parametizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) (followingStates stateList) funcList next))) stateList funcList next) funcList next)])))
 
 ;M-expression - checks if an operation needs to return a number (math equation) or a boolean (t/f).
 (define M-expression
@@ -232,9 +219,9 @@ Project 3 - Imperitive Language Interpreter
       [(eq? '% val)  #t]
       [else          #f])))
 
-;
-;;Variable Declare Functions
-;
+;;=====================================
+;;Variable Declare/Assign/Change
+;;=====================================
 
 ;declared? - takes a var name and the stateList, returning #t if var name exists in statelist. ex: (declared? 'x ((x 3))) returns #t.
 (define declared?
@@ -292,27 +279,25 @@ Project 3 - Imperitive Language Interpreter
       ((equal? (variableDec stateList) var) (cons (list var newVal) (followingStates stateList)))
       (else                                 (cons (frontState stateList) (ChangeBindingInside var newVal (followingStates stateList)))))))
 
-;
-;;Function Declare Functions
-;;;THE BIG SHIT WE NEED 2 DO I THINK ??
-;;Function Declare Functions
-;
+;;=====================================
+;;Function Declare/Assign/Change
+;;=====================================
 
 ;declaredFunction? - takes a var name and the stateList, returning #t if var name exists in statelist. ex: (declared? 'x ((x 3))) returns #t.
 (define declaredFunction?
   (lambda (func bigFuncList)
     (cond
-      ((null? bigFuncList)                            #f)
+      ((null? bigFuncList)                                     #f)
       ((declaredFunctionInside? func (frontState bigFuncList)) #t)
-      (else                                            (declaredFunction? func (followingStates bigFuncList))))))
+      (else                                                   (declaredFunction? func (followingStates bigFuncList))))))
 
 ;declaredFunctionInside? - helper for declared? that dives into deeper states.
 (define declaredFunctionInside?
   (lambda (var funcList)
     (cond
-      ((null?  funcList)                  #f)
+      ((null?  funcList)                       #f)
       ((equal?(variableDec funcList) funcList) #t)
-      (else                                (declaredFunctionInside? funcList (followingStates funcList))))))
+      (else                                    (declaredFunctionInside? funcList (followingStates funcList))))))
 
 ;AddFunctionBinding - takes a var name and the statelist, creates a new binding with given var.
 (define AddFunctionBinding
@@ -325,9 +310,9 @@ Project 3 - Imperitive Language Interpreter
 (define CheckFunctionBinding
   (lambda (func bigFuncList)
     (cond
-      ((null? bigFuncList)                                                         (error 'Interpreter "Function has not been declared."))
+      ((null? bigFuncList)                                                                   (error 'Interpreter "Function has not been declared."))
       ((equal? (frontState (CheckFunctionBindingInside func (frontState bigFuncList))) func) (followingStates (CheckFunctionBindingInside func (frontState bigFuncList)))) ;change abstract?
-      (else                                                                         (CheckFunctionBinding func (followingStates bigFuncList))))))
+      (else                                                                                  (CheckFunctionBinding func (followingStates bigFuncList))))))
 
 ;CheckFunctionBindingInside - takes a sub-stateList, and returns the binding of a corresponding variable if it exists. (var varValue)
 (define CheckFunctionBindingInside
@@ -337,9 +322,9 @@ Project 3 - Imperitive Language Interpreter
       ((equal? (variableDec funcList) func) (frontState funcList))
       (else                                 (CheckFunctionBindingInside func (followingStates funcList))))))
 
-;
+;;=====================================
 ;; M-state related checks
-;
+;;=====================================
 
 ;M-integer - checks what kind of operation needs to be performed, returns an integer.
 (define M-integer
@@ -390,5 +375,5 @@ Project 3 - Imperitive Language Interpreter
 
 ;END
 ;(parser "testthis.txt")
-(interpret "testthis.txt")
+;(interpret "testthis.txt")
  
