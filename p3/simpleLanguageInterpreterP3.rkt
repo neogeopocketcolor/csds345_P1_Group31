@@ -142,6 +142,7 @@ Project 3 - Imperitive Language Interpreter
 ;; General Use
 ;;=====================================
 
+;findGlobal
 (define findGlobal
   (lambda (stateList)
     (if (null? (followingStates stateList)) (frontState stateList)
@@ -181,9 +182,9 @@ Project 3 - Imperitive Language Interpreter
   (lambda (lis stateList funcList next)
     (call/cc
      (lambda (initialReturn)
-       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList))
-                      (list (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) stateList funcList next) (findGlobal stateList))
-                      (push (list (findGlobal funcList)))
+       (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) ;commands (lis)
+                      (list (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) stateList funcList next) (findGlobal stateList)) ;stateList
+                      (push (list (findGlobal funcList))) ;funcList
                       initialNext initialBreak initialThrow initialReturn)
              funcList)))))
 
