@@ -1,5 +1,5 @@
 #lang racket
-(require "functionParser.rkt")
+(require "classParser.rkt")
 
 #|
 
@@ -71,14 +71,14 @@ Project 3 - Imperitive Language Interpreter
 (define paramList car)
 (define commandList cadr)
 
-;parametrizing
-(define parametizeCheckCdr
+;parameterizing
+(define parameterizeCheckCdr
   (lambda (val)
     (if (list? val)
         (cdr val)
         val)))
 
-(define parametizeCheckCar
+(define parameterizeCheckCar
   (lambda (val)
     (if (list? val)
         (car val)
@@ -87,6 +87,47 @@ Project 3 - Imperitive Language Interpreter
 ;;=====================================
 ;;Proper Functions
 ;;=====================================
+
+
+#|
+Create helper functions to create a class closure and an instance closure and
+to access the members of the class closure and instance closure. The class closure
+must contain the parent/super class, the list of instance field names and the expressions
+that compute their initial values (if any), the list of methods/function names and closures,
+and (optionally) a list of class field names/values and a list of constructors. You may use
+your state/environment structure for each of these lists. The instance closure must contain
+the instance's class (i.e. the run-time type or the true type) and a list of instance field values.
+|#
+; class definition looks like this:
+; '(class B (extends A) ((var c 10) (function test () ((return 10))) (static-function main () ())))
+; If does not extend:
+; '(class A ((function test () ((return 10))) (static-function main () ())))
+(define create-class-closure (lambda (class-definition)
+  ; class-definition is a list of the form (class <class-name> (extends <parent-class>) <class-body>)
+  ; class-body is a list of the form ((<field-definition>*) (<method-definition>*))
+  ; If the class extends another class:
+  (if (eq? (cadr class-definition) 'extends)
+   (let ([parent-class (caddr class-definition)]
+         [class-body (cdddr class-definition)])
+     (list parent-class
+           (map (lambda (field-definition)
+                  (list (caar field-definition) (cadar field-definition)))
+                (car class-body))
+           (map (lambda (method-definition)
+                  (list (caar method-definition) (cadar method-definition)))
+                (cadr class-body)))
+    )
+    (let ([class-body (caddr class-definition)])
+      (list 'null
+            (map (lambda (field-definition)
+                    (list (caar field-definition) (cadar field-definition)))
+                  (car class-body))
+            (map (lambda (method-definition)
+                    (list (caar method-definition) (cadar method-definition)))
+                  (cadr class-body)))
+    )
+  )
+))
 
 ;interpret command - required, parses the input file and executes the code.
 (define interpret
@@ -183,18 +224,18 @@ Project 3 - Imperitive Language Interpreter
     (call/cc
      (lambda (initialReturn)
        (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) ;commands (lis)
-                      (list (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) stateList funcList next) (findGlobal stateList)) ;stateList
+                      (list (parameterize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) stateList funcList next) (findGlobal stateList)) ;stateList
                       (push (list (findGlobal funcList))) ;funcList
                       initialNext initialBreak initialThrow initialReturn)
              funcList)))))
 
-;parametize - takes list of formal and actual parameters and declares the formal parameters accordingly to the proper environment
-(define parametize
+;parameterize - takes list of formal and actual parameters and declares the formal parameters accordingly to the proper environment
+(define parameterize
   (lambda (formal actual stateList funcList next)
     (cond
       [(and (null? formal) (not (null? actual))) (error 'Interpreter "Formal paremeters does not match number of actual paremeters.")]
       [(null? formal)                            (frontState stateList)]
-      [else (parametize (cdr formal)             (parametizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) (followingStates stateList) funcList next))) stateList funcList next) funcList next)])))
+      [else (parameterize (cdr formal)             (parameterizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parameterizeCheckCar actual) (followingStates stateList) funcList next))) stateList funcList next) funcList next)])))
 
 
 ;;=====================================
@@ -388,6 +429,7 @@ Project 3 - Imperitive Language Interpreter
   
 
 ;END
-;(parser "testthis.txt")
+(parser "p4/test.java")
+(create-class-closure '(class B (extends A) ((var c 10) (function test () ((return 10))) (static-function main () ()))))
 ;(interpret "testthis.txt")
  
