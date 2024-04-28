@@ -1,4 +1,5 @@
 class B {
+  var c = 10;
   function test() {
     return 10;
   }
