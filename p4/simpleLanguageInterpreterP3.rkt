@@ -369,8 +369,8 @@ Project 3 - Imperitive Language Interpreter
     (cond
       ((null? statement)                           (error 'Interpreter "M-return error - Null statement somehow"))
       ((number? (returnVal statement))             (returnBinding (returnVal statement) (pop stateList) funcList next))
-      ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement))) 'true) ; TO DO -- add returnbinding
-      ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement))) 'false) ; TO DO -- add returnbiding
+      ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement))) (returnBinding #t (pop stateList) funcList next))
+      ((or (eq? #f (returnVal statement)) (eq? 'false (returnVal statement))) (returnBinding #f (pop stateList) funcList next))
       ((pair? (returnVal statement))               (M-return (returnify (M-expression (returnVal statement) stateList funcList initialNext)) stateList funcList next)) ;if an expression, call m-expression
       ((declared? (returnVal statement) stateList) (M-return (returnify (CheckBinding (returnVal statement) stateList)) stateList funcList next)) ;check if statement is a declared variable, if so return the value.
       (else                                        (error 'Interpreter "M-return error - Not accounted for")))))
