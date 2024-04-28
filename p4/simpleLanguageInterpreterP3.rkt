@@ -196,29 +196,6 @@ Project 3 - Imperitive Language Interpreter
       [(null? formal)                            (frontState stateList)]
       [else (parametize (cdr formal)             (parametizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) (followingStates stateList) funcList next))) stateList funcList next) funcList next)])))
 
-;M-expression - checks if an operation needs to return a number (math equation) or a boolean (t/f).
-(define M-expression
-  (lambda (lis stateList funcList next)
-    (cond
-      [(not (list? lis)) (if (math? lis)
-                                     (M-integer lis stateList funcList)
-                                     (M-boolean lis stateList funcList next))]
-      [(declared? lis stateList)     (M-expression (CheckBinding lis stateList funcList) stateList funcList next)]
-      [(math? (operator lis))        (M-integer lis stateList funcList)]
-      [(eq? (operator lis) 'funcall) (M-funcall lis (push stateList) (push funcList) (lambda (v f) v))] 
-      [else                          (M-boolean lis stateList funcList next)])))
-
-;math? - tests if val is a number or math operator, returning #t if it is, #f otherwise.
-(define math?
-  (lambda (val)
-    (cond
-      [(number? val) #t]
-      [(eq? '+ val)  #t]
-      [(eq? '- val)  #t]
-      [(eq? '/ val)  #t]
-      [(eq? '* val)  #t]
-      [(eq? '% val)  #t]
-      [else          #f])))
 
 ;;=====================================
 ;;Variable Declare/Assign/Change
@@ -327,13 +304,37 @@ Project 3 - Imperitive Language Interpreter
 ;; M-state related checks
 ;;=====================================
 
+;M-expression - checks if an operation needs to return a number (math equation) or a boolean (t/f).
+(define M-expression
+  (lambda (lis stateList funcList next)
+    (cond
+      [(not (list? lis)) (if (math? lis)
+                                     (M-integer lis stateList funcList)
+                                     (M-boolean lis stateList funcList next))]
+      [(declared? lis stateList)     (M-expression (CheckBinding lis stateList funcList) stateList funcList next)]
+      [(math? (operator lis))        (M-integer lis stateList funcList)]
+      [(eq? (operator lis) 'funcall) (getReturnValue (M-funcall lis (push stateList) (push funcList) (lambda (v f) v)))] 
+      [else                          (M-boolean lis stateList funcList next)])))
+
+;math? - tests if val is a number or math operator, returning #t if it is, #f otherwise.
+(define math?
+  (lambda (val)
+    (cond
+      [(number? val) #t]
+      [(eq? '+ val)  #t]
+      [(eq? '- val)  #t]
+      [(eq? '/ val)  #t]
+      [(eq? '* val)  #t]
+      [(eq? '% val)  #t]
+      [else          #f])))
+
 ;M-integer - checks what kind of operation needs to be performed, returns an integer.
 (define M-integer
   (lambda (lis stateList funcList)
     (cond
       [(number? lis)                 lis]
       [(not (list? lis))             (CheckBinding lis stateList)]
-      [(eq? (operator lis) 'funcall) (M-funcall lis (push stateList) (push funcList) (lambda (v f) v))]
+      [(eq? (operator lis) 'funcall) (getReturnValue (M-funcall lis (push stateList) (push funcList) (lambda (v f) v)))]
       [(eq? (operator lis) '+)       (+ (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
       [(and (eq? (operator lis) '-)  (null? (value lis))) (- 0 (M-integer (leftoperand lis) stateList funcList))]
       [(eq? (operator lis) '-)       (- (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
@@ -349,7 +350,7 @@ Project 3 - Imperitive Language Interpreter
       [(or (eq? lis 'true) (eq? lis #t))          #t]
       [(or (eq? lis 'false) (eq? lis #f))         #f]
       [(not (list? lis))        (CheckBinding lis stateList)]
-      [(eq? (operator lis) 'funcall) (M-funcall lis (push stateList) (push funcList) (lambda (v f) v))]
+      [(eq? (operator lis) 'funcall) (getReturnValue (M-funcall lis (push stateList) (push funcList) (lambda (v f) v)))]
       [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis) stateList funcList next) (M-boolean (rightoperand lis) stateList funcList next))]
       [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis) stateList funcList next) (M-boolean (rightoperand lis) stateList funcList next))]
       [(eq? (operator lis) '!)  (not (M-boolean (leftoperand lis) stateList funcList next))]
@@ -367,67 +368,24 @@ Project 3 - Imperitive Language Interpreter
   (lambda (statement stateList funcList next)
     (cond
       ((null? statement)                           (error 'Interpreter "M-return error - Null statement somehow"))
-      ((number? (returnVal statement))             (returnVal statement))
-      ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement))) 'true)
-      ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement))) 'false)
+      ((number? (returnVal statement))             (returnBinding (returnVal statement) stateList funcList next))
+      ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement))) 'true) ; TO DO -- add returnbinding
+      ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement))) 'false) ; TO DO -- add returnbiding
       ((pair? (returnVal statement))               (M-return (returnify (M-expression (returnVal statement) stateList funcList initialNext)) stateList funcList next)) ;if an expression, call m-expression
       ((declared? (returnVal statement) stateList) (M-return (returnify (CheckBinding (returnVal statement) stateList)) stateList funcList next)) ;check if statement is a declared variable, if so return the value.
       (else                                        (error 'Interpreter "M-return error - Not accounted for")))))
 
 
-;;============================================================
-;;CLASSES
-;;============================================================
+(define returnBinding
+  (lambda (toReturn stateList funcList next)
+    (if (null? toReturn)
+        (M-assign (cons 'var (list 'returnValue123 'null)) stateList funcList next)
+        (M-assign (cons 'var (list 'returnValue123 toReturn)) stateList funcList next))))
 
-
-
-; An interpreter for the simple language that uses call/cc for the continuations.
-; Does not handle side effects.
-
-; Create helper functions to create a class closure and an instance closure and to access the members
-; of the class closure and instance closure. The class closure must contain the parent/super class,
-; the list of instance field names and the expressions that compute their initial values (if any),
-; the list of methods/function names and closures, and (optionally) a list of class field names/values
-; and a list of constructors. You may use your state/environment structure for each of these lists.
-; The instance closure must contain the instance's class (i.e. the run-time type or the true type)
-; and a list of instance field values.
-(define (make-class-closure parent instance-field-names initial-values method-names method-closures class-field-names class-field-values constructors)
-  (hash 'parent parent
-        'instance-field-names instance-field-names
-        'initial-values initial-values
-        'method-names method-names
-        'method-closures method-closures
-        'class-field-names class-field-names
-        'class-field-values class-field-values
-        'constructors constructors))
-
-(define (make-instance-closure class instance-field-values)
-  (hash 'class class
-        'instance-field-values instance-field-values))
-
-(define (get-class-members class-closure)
-  (hash-values class-closure))
-
-(define (get-instance-members instance-closure)
-  (hash-values instance-closure))
-
-(define class-def-name car)
-
-(define (interpret-class-list class-list environment)
-  (if (null? class-list)
-      environment
-      (let* ((class-def (car class-list))
-             (class-name (class-def-name class-def))
-             (class-closure (make-class-closure class-def)))
-        (interpret-class-list (cdr class-list) (insert class-name class-closure environment)))))
-
-
-
-
-
-
-
-
+(define getReturnValue
+  (lambda (stateList)
+    (CheckBinding 'returnValue123 stateList)))
+  
 
 ;END
 ;(parser "testthis.txt")
