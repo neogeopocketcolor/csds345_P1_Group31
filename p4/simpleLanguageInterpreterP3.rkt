@@ -368,7 +368,7 @@ Project 3 - Imperitive Language Interpreter
   (lambda (statement stateList funcList next)
     (cond
       ((null? statement)                           (error 'Interpreter "M-return error - Null statement somehow"))
-      ((number? (returnVal statement))             (returnBinding (returnVal statement) stateList funcList next))
+      ((number? (returnVal statement))             (returnBinding (returnVal statement) (pop stateList) funcList next))
       ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement))) 'true) ; TO DO -- add returnbinding
       ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement))) 'false) ; TO DO -- add returnbiding
       ((pair? (returnVal statement))               (M-return (returnify (M-expression (returnVal statement) stateList funcList initialNext)) stateList funcList next)) ;if an expression, call m-expression
