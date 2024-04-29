@@ -34,6 +34,7 @@ Project 3 - Imperitive Language Interpreter
 (define initialNext (lambda (v1 v2) v1))
 (define initialBreak (lambda (v) (error 'Interpreter "'break' command executed in main.")))
 (define initialThrow (lambda (v) (error 'Interpreter "'throw' must be used within a 'try'")))
+(define initialCTimeVars '(()))
 
 ;variables
 (define variableDec caar)
@@ -93,49 +94,49 @@ Project 3 - Imperitive Language Interpreter
   (lambda (filename)
     (call/cc
      (lambda (initialReturn)
-       (M-state (parser filename) initialState initialFunc (lambda (s f) (mainReturn (initialReturn (M-funcall '(funcall main) (push s) (push f) initialNext)))) initialBreak initialThrow initialReturn)))))
+       (M-state (parser filename) initialState initialFunc (lambda (s f) (mainReturn (initialReturn (M-funcall '(funcall main) (push s) (push f) initialNext initialCTimeVars)) initialCTimeVars)) initialBreak initialThrow initialReturn initialCTimeVars)))))
   
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
-  (lambda (lis stateList funcList next break throw return)
+  (lambda (lis stateList funcList next break throw return cTime)
     (cond
       [(null? lis) (next stateList funcList)]
-      [(eq? (command lis) '=)        (M-assign (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return) f)))]
-      [(eq? (command lis) 'var)      (M-declare (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return) f)))]
+      [(eq? (command lis) '=)        (M-assign (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return cTime) f)) cTime)]
+      [(eq? (command lis) 'var)      (M-declare (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return cTime) f)) cTime)]
       
-      [(eq? (command lis) 'if)       (if (M-boolean (condition lis) stateList funcList next)
-                                         (M-state (statement1 lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return) f) break throw return) break throw return)
+      [(eq? (command lis) 'if)       (if (M-boolean (condition lis) stateList funcList next cTime)
+                                         (M-state (statement1 lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return cTime) f) break throw return) break throw return cTime)
                                          (if (not (null? (M-else lis)))
-                                             (M-state (statement2 lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return) f)) break throw return)
-                                             (next (M-state (nextStatement lis) stateList funcList next break throw return) funcList)))]
+                                             (M-state (statement2 lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return) f)) break throw return cTime)
+                                             (next (M-state (nextStatement lis) stateList funcList next break throw return cTime) funcList)))]
       
-      [(eq? (command lis) 'while)    (loop (condition lis) (body lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s funcList next break throw return) funcList))
-                                           (lambda (s f) (break (M-state (nextStatement lis) s funcList next break throw return))) throw return)]
-      [(eq? (command lis) 'return)   (return (M-return (statement lis) stateList funcList next))]
+      [(eq? (command lis) 'while)    (loop (condition lis) (body lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s funcList next break throw return cTime) funcList))
+                                           (lambda (s f) (break (M-state (nextStatement lis) s funcList next break throw return cTime))) throw return cTime)]
+      [(eq? (command lis) 'return)   (return (M-return (statement lis) stateList funcList next cTime))]
       
-      [(eq? (command lis) 'begin)    (M-state (beginBody lis) (push stateList) (push funcList) (lambda (s f) (next (M-state (nextStatement lis) (pop s) (pop f) next break throw return) f)) ; something here makes the stateList the return function
-                                           (lambda (s f) (call/cc (lambda k (break (M-state (nextStatement lis) (pop s) (pop funcList) next k throw return))))) throw return)]
+      [(eq? (command lis) 'begin)    (M-state (beginBody lis) (push stateList) (push funcList) (lambda (s f) (next (M-state (nextStatement lis) (pop s) (pop f) next break throw return cTime) f)) ; something here makes the stateList the return function
+                                           (lambda (s f) (call/cc (lambda k (break (M-state (nextStatement lis) (pop s) (pop funcList) next k throw return cTime))))) throw return cTime)]
       
-      [(eq? (command lis) 'try)      (M-state (lisBeginning (beginBody lis)) (push stateList) (push funcList) (lambda (s1) (if (null? (finallyPoint (finallyShortcut lis))) (next (M-state (nextStatement lis) (pop s1) funcList next break throw return))
-                                                                                                      (next (M-state (finallyShortcut lis) s1 funcList (lambda (s) (M-state (nextStatement lis) s funcList next break throw return)) break throw return)))) ;next, go to finally
-                                              (lambda (s1) (M-state (finallyShortcut lis) s1 funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return))) break throw return)) ;if broken, go to finally
-                                              (lambda (e s f) (M-state (catchShortcut lis) (ChangeBinding (innerState (beginBody (catchShortcut lis))) e (AddBinding (innerState (beginBody (catchShortcut lis))) s funcList) funcList) ;if exception is thrown, go to catch
-                                                                     (lambda (s1) (if (null? (finallyPoint (finallyShortcut lis))) (M-state (nextStatement lis) (pop s1) funcList next break throw return)
-                                                                                      (M-state (finallyShortcut lis) s1 funcList (lambda (s2) (M-state (nextStatement lis) s2 funcList next break throw return)) break throw return)));catch's next statement is finally
-                                                                     break throw return)) return)] ;catch's break statement is finally
+      [(eq? (command lis) 'try)      (M-state (lisBeginning (beginBody lis)) (push stateList) (push funcList) (lambda (s1) (if (null? (finallyPoint (finallyShortcut lis))) (next (M-state (nextStatement lis) (pop s1) funcList next break throw return cTime))
+                                                                                                      (next (M-state (finallyShortcut lis) s1 funcList (lambda (s) (M-state (nextStatement lis) s funcList next break throw return cTime)) break throw return cTime)))) ;next, go to finally
+                                              (lambda (s1) (M-state (finallyShortcut lis) s1 funcList (lambda (s) (next (M-state (nextStatement lis) s funcList next break throw return cTime))) break throw return cTime)) ;if broken, go to finally
+                                              (lambda (e s f) (M-state (catchShortcut lis) (ChangeBinding (innerState (beginBody (catchShortcut lis))) e (AddBinding (innerState (beginBody (catchShortcut lis))) s funcList cTime) funcList cTime) ;if exception is thrown, go to catch
+                                                                     (lambda (s1) (if (null? (finallyPoint (finallyShortcut lis))) (M-state (nextStatement lis) (pop s1) funcList next break throw return cTime)
+                                                                                      (M-state (finallyShortcut lis) s1 funcList (lambda (s2) (M-state (nextStatement lis) s2 funcList next break throw return cTime)) break throw return cTime)));catch's next statement is finally
+                                                                     break throw return cTime)) return cTime)] ;catch's break statement is finally
       
-      [(eq? (command lis) 'catch)    (M-state (finallyPointAlt (beginBody lis)) stateList funcList (lambda (s) (next s)) (lambda (s) (next s)) throw return)]
+      [(eq? (command lis) 'catch)    (M-state (finallyPointAlt (beginBody lis)) stateList funcList (lambda (s) (next s)) (lambda (s) (next s)) throw return cTime)]
       [(eq? (command lis) 'throw)    (throw (cadar lis) stateList)]
       [(eq? (command lis) 'finally)  (M-state (lisBeginning (beginBody lis)) stateList funcList
                                               (lambda (s) (next (pop s)))
-                                              (lambda (s) (next (pop s))) throw return)] ;return popped state
+                                              (lambda (s) (next (pop s))) throw return cTime)] ;return popped state
       
       [(eq? (command lis) 'break)    (break stateList)]
       [(eq? (command lis) 'continue) (next stateList)]
       
-      [(eq? (command lis) 'function) (M-declareFunction (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) stateList f next break throw return) funcList)))]
-      [(eq? (command lis) 'funcall)  (M-funcall (statement lis) (push stateList) (push funcList) (lambda (s f) (next (M-state (nextStatement lis) (pop s) (pop f) next break throw return))))]
-      [(eq? (command lis) 'class)    (create-class-closure (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return funcList))))]
+      [(eq? (command lis) 'function) (M-declareFunction (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) stateList f next break throw return cTime) funcList)))]
+      [(eq? (command lis) 'funcall)  (M-funcall (statement lis) (push stateList) (push funcList) (lambda (s f) (next (M-state (nextStatement lis) (pop s) (pop f) next break throw return cTime))) cTime)]
+      [(eq? (command lis) 'class)    (create-class-closure (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return funcList cTime))))]
       ; PLACE HOLDER!!!                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       [else                          (error 'Interpreter "Not a valid command")])))
 
@@ -152,27 +153,27 @@ Project 3 - Imperitive Language Interpreter
 
 ;Helper function for loops
 (define loop
-  (lambda (condition body stateList funcList next break throw return)
-    (if (M-boolean condition stateList funcList next)
+  (lambda (condition body stateList funcList next break throw return cTime)
+    (if (M-boolean condition stateList funcList next cTime)
         (M-state body stateList funcList
-                 (lambda (s f) (loop condition body s funcList next break throw return))
-                 break throw return)
+                 (lambda (s f) (loop condition body s funcList next break throw return cTime))
+                 break throw return cTime)
         (next stateList funcList))))
 
 ;M-declare - declares a variable, either with or without a binding to a value.
 (define M-declare
-  (lambda (lis stateList funcList next)
+  (lambda (lis stateList funcList next cTime)
     (if (null? (value lis))
-        (next (AddBinding (varValue lis) stateList funcList)) ;declare only
-        (M-assign lis (AddBinding (varValue lis) stateList) funcList next)))) ;declare and assign
+        (next (AddBinding (varValue lis) stateList funcList cTime)) ;declare only
+        (M-assign lis (AddBinding (varValue lis) stateList funcList cTime) funcList next cTime)))) ;declare and assign
 
         
 ;M-assign - assigns a binding to a variable if the variable doesn't already have a value.
 (define M-assign 
-  (lambda (lis stateList funcList next)
-    (if (not (declared? (leftoperand lis) stateList))
+  (lambda (lis stateList funcList next cTime)
+    (if (not (declared? (leftoperand lis) stateList cTime))
         (error 'Interpreter "Variable not declared. :(")
-        (next (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList funcList next) stateList funcList) funcList))))
+        (next (ChangeBinding (leftoperand lis) (M-expression (rightoperand lis) stateList funcList next cTime) stateList funcList cTime) funcList))))
 
 ;M-declareFunction - declares a function, binding the function's name, (formal parameters), and (comamands), into one readable lis.
 (define M-declareFunction
@@ -181,22 +182,24 @@ Project 3 - Imperitive Language Interpreter
 
 ;M-funcall - handles the calling of a function. Finds if the function's name exists in stateList, and if it does
 (define M-funcall
-  (lambda (lis stateList funcList next)
+  (lambda (lis stateList funcList next cTime)
     (call/cc
      (lambda (initialReturn)
        (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) ;commands (lis)
-                      (list (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) stateList funcList next) (findGlobal stateList)) ;stateList
+                      (list (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) stateList funcList next cTime) (findGlobal stateList)) ;stateList
                       (push (list (findGlobal funcList))) ;funcList
-                      initialNext initialBreak initialThrow initialReturn)
+                      initialNext initialBreak initialThrow initialReturn cTime)
              funcList)))))
 
 ;parametize - takes list of formal and actual parameters and declares the formal parameters accordingly to the proper environment
 (define parametize
-  (lambda (formal actual stateList funcList next)
+  (lambda (formal actual stateList funcList next cTime)
     (cond
       [(and (null? formal) (not (null? actual))) (error 'Interpreter "Formal paremeters does not match number of actual paremeters.")]
       [(null? formal)                            (frontState stateList)]
-      [else (parametize (cdr formal)             (parametizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) (followingStates stateList) funcList next))) stateList funcList next) funcList next)])))
+      [else                                      (parametize (cdr formal) (parametizeCheckCdr actual)
+                                                             (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) (followingStates stateList) funcList next cTime))) stateList funcList next cTime)
+                                                             funcList next cTime)])))
 
 
 ;;=====================================
@@ -205,59 +208,59 @@ Project 3 - Imperitive Language Interpreter
 
 ;declared? - takes a var name and the stateList, returning #t if var name exists in statelist. ex: (declared? 'x ((x 3))) returns #t.
 (define declared?
-  (lambda (var bigStateList)
+  (lambda (var bigStateList cTime)
     (cond
-      ((null? bigStateList)                            #f)
-      ((declaredInside? var (frontState bigStateList)) #t)
-      (else                                            (declared? var (followingStates bigStateList))))))
+      ((null? bigStateList)                                  #f)
+      ((declaredInside? var (frontState bigStateList) cTime) #t)
+      (else                                                  (declared? var (followingStates bigStateList) cTime)))))
 
 ;delcaredInside? - helper for declared? that dives into deeper states.
 (define declaredInside?
-  (lambda (var stateList)
+  (lambda (var stateList cTime)
     (cond
       ((null?  stateList)                  #f)
       ((equal?(variableDec stateList) var) #t)
-      (else                                (declaredInside? var (followingStates stateList))))))
+      (else                                (declaredInside? var (followingStates stateList) cTime)))))
 
 ;AddBinding - takes a var name and the statelist, creates a new binding with given var.
 (define AddBinding
-  (lambda (var stateList)
-    (if (declaredInside? var (frontState stateList))
+  (lambda (var stateList cTime)
+    (if (declaredInside? var (frontState stateList) cTime)
         (error 'Interpreter "Variable already declared.")
         (cons (cons (list var 'null) (frontState stateList)) (followingStates stateList)))))
 
 ;CheckBinding - takes a var name and statelist, then returns the value of the variable. returns the first instance of said variable
 (define CheckBinding
-  (lambda (var bigStateList)
+  (lambda (var bigStateList cTime)
     (cond
-      ((null? bigStateList)                                                         (error 'Interpreter "Variable has not been declared."))
-      ((equal? (frontState (CheckBindingInside var (frontState bigStateList))) var) (innerFollowingStates (CheckBindingInside var (frontState bigStateList))))
-      (else                                                                         (CheckBinding var (followingStates bigStateList))))))
+      ((null? bigStateList)                                                               (error 'Interpreter "Variable has not been declared."))
+      ((equal? (frontState (CheckBindingInside var (frontState bigStateList) cTime)) var) (innerFollowingStates (CheckBindingInside var (frontState bigStateList) cTime)))
+      (else                                                                               (CheckBinding var (followingStates bigStateList) cTime)))))
 
 ;CheckBindingInside - takes a sub-stateList, and returns the binding of a corresponding variable if it exists. (var varValue)
 (define CheckBindingInside
-  (lambda (var stateList)
+  (lambda (var stateList cTime)
     (cond
       ((null? stateList)                     emptyReturn)
       ((equal? (variableDec stateList) var) (frontState stateList))
-      (else                                 (CheckBindingInside var (followingStates stateList))))))
+      (else                                 (CheckBindingInside var (followingStates stateList) cTime)))))
 
 
 ;ChangeBinding - takes a var name, value, and stateList, then returns the stateList with the new variable's value updated.
 (define ChangeBinding
-  (lambda (var newVal bigStateList funcList)
+  (lambda (var newVal bigStateList funcList cTime)
     (cond
-      [(null? bigStateList)                            (error `Interpreter "Variable has not been declared.")]
-      [(declaredInside? var (frontState bigStateList)) (cons (ChangeBindingInside var newVal (frontState bigStateList)) (followingStates bigStateList))]
-      [else                                            (cons (frontState bigStateList) (ChangeBinding var newVal (followingStates bigStateList) funcList))])))
+      [(null? bigStateList)                                  (error `Interpreter "Variable has not been declared.")]
+      [(declaredInside? var (frontState bigStateList) cTime) (cons (ChangeBindingInside var newVal (frontState bigStateList) cTime) (followingStates bigStateList))]
+      [else                                                  (cons (frontState bigStateList) (ChangeBinding var newVal (followingStates bigStateList) funcList cTime))])))
 
 ;ChangeBindingInside - helper for ChangeBinding for deeper states.
 (define ChangeBindingInside
-  (lambda (var newVal stateList)
+  (lambda (var newVal stateList cTime)
     (cond
       ((null? stateList)                     stateList)
       ((equal? (variableDec stateList) var) (cons (list var newVal) (followingStates stateList)))
-      (else                                 (cons (frontState stateList) (ChangeBindingInside var newVal (followingStates stateList)))))))
+      (else                                 (cons (frontState stateList) (ChangeBindingInside var newVal (followingStates stateList) cTime))))))
 
 ;;=====================================
 ;;Function Declare/Assign/Change
@@ -308,15 +311,15 @@ Project 3 - Imperitive Language Interpreter
 
 ;M-expression - checks if an operation needs to return a number (math equation) or a boolean (t/f).
 (define M-expression
-  (lambda (lis stateList funcList next)
+  (lambda (lis stateList funcList next cTime)
     (cond
-      [(not (list? lis)) (if (math? lis)
-                                     (M-integer lis stateList funcList)
-                                     (M-boolean lis stateList funcList next))]
-      [(declared? lis stateList)     (M-expression (CheckBinding lis stateList funcList) stateList funcList next)]
-      [(math? (operator lis))        (M-integer lis stateList funcList)]
-      [(eq? (operator lis) 'funcall) (getReturnValue (M-funcall lis (push stateList) (push funcList) (lambda (v f) v)))] 
-      [else                          (M-boolean lis stateList funcList next)])))
+      [(not (list? lis))                   (if (math? lis)
+                                              (M-integer lis stateList funcList cTime)
+                                              (M-boolean lis stateList funcList next cTime))]
+      [(declared? lis stateList cTime)     (M-expression (CheckBinding lis stateList cTime) stateList funcList next cTime)]
+      [(math? (operator lis))              (M-integer lis stateList funcList cTime)]
+      [(eq? (operator lis) 'funcall)       (getReturnValue (M-funcall lis (push stateList) (push funcList) (lambda (v f) v) cTime) cTime)] 
+      [else                                (M-boolean lis stateList funcList next cTime)])))
 
 ;math? - tests if val is a number or math operator, returning #t if it is, #f otherwise.
 (define math?
@@ -332,68 +335,68 @@ Project 3 - Imperitive Language Interpreter
 
 ;M-integer - checks what kind of operation needs to be performed, returns an integer.
 (define M-integer
-  (lambda (lis stateList funcList)
+  (lambda (lis stateList funcList cTime)
     (cond
       [(number? lis)                 lis]
-      [(not (list? lis))             (CheckBinding lis stateList)]
-      [(eq? (operator lis) 'funcall) (getReturnValue (M-funcall lis (push stateList) (push funcList) (lambda (v f) v)))]
-      [(eq? (operator lis) '+)       (+ (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
-      [(and (eq? (operator lis) '-)  (null? (value lis))) (- 0 (M-integer (leftoperand lis) stateList funcList))]
-      [(eq? (operator lis) '-)       (- (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
-      [(eq? (operator lis) '*)       (* (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
-      [(eq? (operator lis) '/)       (quotient (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
-      [(eq? (operator lis) '%)       (remainder (M-integer (leftoperand lis) stateList funcList) (M-integer (rightoperand lis) stateList funcList))]
+      [(not (list? lis))             (CheckBinding lis stateList cTime)]
+      [(eq? (operator lis) 'funcall) (getReturnValue (M-funcall lis (push stateList) (push funcList) (lambda (v f) v) cTime) cTime)]
+      [(eq? (operator lis) '+)       (+ (M-integer (leftoperand lis) stateList funcList cTime) (M-integer (rightoperand lis) stateList funcList cTime))]
+      [(and (eq? (operator lis) '-)  (null? (value lis))) (- 0 (M-integer (leftoperand lis) stateList funcList cTime))]
+      [(eq? (operator lis) '-)       (- (M-integer (leftoperand lis) stateList funcList cTime) (M-integer (rightoperand lis) stateList funcList cTime))]
+      [(eq? (operator lis) '*)       (* (M-integer (leftoperand lis) stateList funcList cTime) (M-integer (rightoperand lis) stateList funcList cTime))]
+      [(eq? (operator lis) '/)       (quotient (M-integer (leftoperand lis) stateList funcList cTime) (M-integer (rightoperand lis) stateList funcList cTime))]
+      [(eq? (operator lis) '%)       (remainder (M-integer (leftoperand lis) stateList funcList cTime) (M-integer (rightoperand lis) stateList funcList cTime))]
       [else                          (error 'Interpreter "M-integer_Error")])))
 
 ;M-boolean - checks what kind of comparison must be made, returns either #t or #f.
 (define M-boolean
-  (lambda (lis stateList funcList next)
+  (lambda (lis stateList funcList next cTime)
     (cond
       [(or (eq? lis 'true) (eq? lis #t))          #t]
       [(or (eq? lis 'false) (eq? lis #f))         #f]
-      [(not (list? lis))        (CheckBinding lis stateList)]
-      [(eq? (operator lis) 'funcall) (getReturnValue (M-funcall lis (push stateList) (push funcList) (lambda (v f) v)))]
-      [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis) stateList funcList next) (M-boolean (rightoperand lis) stateList funcList next))]
-      [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis) stateList funcList next) (M-boolean (rightoperand lis) stateList funcList next))]
-      [(eq? (operator lis) '!)  (not (M-boolean (leftoperand lis) stateList funcList next))]
-      [(eq? (operator lis) '==) (eq? (M-expression (leftoperand lis) stateList funcList next) (M-expression (rightoperand lis) stateList funcList next))]
-      [(eq? (operator lis) '>)  (> (M-expression (leftoperand lis) stateList funcList next) (M-expression (rightoperand lis) stateList funcList next))]
-      [(eq? (operator lis) '<)  (< (M-expression (leftoperand lis) stateList funcList next) (M-expression (rightoperand lis) stateList funcList next))]
-      [(eq? (operator lis) '<=) (<= (M-expression (leftoperand lis) stateList funcList next) (M-expression (rightoperand lis) stateList funcList next))]
-      [(eq? (operator lis) '>=) (>= (M-expression (leftoperand lis) stateList funcList next) (M-expression (rightoperand lis) stateList funcList next))]
-      [(eq? (operator lis) '!=) (not (eq? (M-expression (leftoperand lis) stateList funcList next) (M-expression (rightoperand lis) stateList funcList next)))]
+      [(not (list? lis))        (CheckBinding lis stateList cTime)]
+      [(eq? (operator lis) 'funcall) (getReturnValue (M-funcall lis (push stateList) (push funcList) (lambda (v f) v) cTime) cTime)]
+      [(eq? (operator lis) '&&) (and (M-boolean (leftoperand lis) stateList funcList next cTime) (M-boolean (rightoperand lis) stateList funcList next cTime))]
+      [(eq? (operator lis) '||) (or (M-boolean (leftoperand lis) stateList funcList next cTime) (M-boolean (rightoperand lis) stateList funcList next cTime))]
+      [(eq? (operator lis) '!)  (not (M-boolean (leftoperand lis) stateList funcList next cTime))]
+      [(eq? (operator lis) '==) (eq? (M-expression (leftoperand lis) stateList funcList next cTime) (M-expression (rightoperand lis) stateList funcList next cTime))]
+      [(eq? (operator lis) '>)  (> (M-expression (leftoperand lis) stateList funcList next cTime) (M-expression (rightoperand lis) stateList funcList next cTime))]
+      [(eq? (operator lis) '<)  (< (M-expression (leftoperand lis) stateList funcList next cTime) (M-expression (rightoperand lis) stateList funcList next cTime))]
+      [(eq? (operator lis) '<=) (<= (M-expression (leftoperand lis) stateList funcList next cTime) (M-expression (rightoperand lis) stateList funcList next cTime))]
+      [(eq? (operator lis) '>=) (>= (M-expression (leftoperand lis) stateList funcList next cTime) (M-expression (rightoperand lis) stateList funcList next cTime))]
+      [(eq? (operator lis) '!=) (not (eq? (M-expression (leftoperand lis) stateList funcList next cTime) (M-expression (rightoperand lis) stateList funcList next cTime)))]
       [else                     (error 'Interpreter "M-boolean_Error")])))
       
 
 ;M-return - prints out the requested return value. Makes sure that #t/#f becomes 'true and 'false as well.
 (define M-return
-  (lambda (statement stateList funcList next)
+  (lambda (statement stateList funcList next cTime)
     (cond
-      ((null? statement)                           (error 'Interpreter "M-return error - Null statement somehow"))
-      ((number? (returnVal statement))             (returnBinding (returnVal statement) (pop stateList) funcList next))
-      ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement))) (returnBinding #t (pop stateList) funcList next))
-      ((or (eq? #f (returnVal statement)) (eq? 'false (returnVal statement))) (returnBinding #f (pop stateList) funcList next))
-      ((pair? (returnVal statement))               (M-return (returnify (M-expression (returnVal statement) stateList funcList initialNext)) stateList funcList next)) ;if an expression, call m-expression
-      ((declared? (returnVal statement) stateList) (M-return (returnify (CheckBinding (returnVal statement) stateList)) stateList funcList next)) ;check if statement is a declared variable, if so return the value.
-      (else                                        (error 'Interpreter "M-return error - Not accounted for")))))
+      ((null? statement)                                 (error 'Interpreter "M-return error - Null statement somehow"))
+      ((number? (returnVal statement))                   (returnBinding (returnVal statement) (pop stateList) funcList next cTime))
+      ((or (eq? #t (returnVal statement)) (eq? 'true (returnVal statement)))  (returnBinding #t (pop stateList) funcList next cTime))
+      ((or (eq? #f (returnVal statement)) (eq? 'false (returnVal statement))) (returnBinding #f (pop stateList) funcList next cTime))
+      ((pair? (returnVal statement))                     (M-return (returnify (M-expression (returnVal statement) stateList funcList initialNext cTime)) stateList funcList next cTime)) ;if an expression, call m-expression
+      ((declared? (returnVal statement) stateList cTime) (M-return (returnify (CheckBinding (returnVal statement) stateList cTime)) stateList funcList next cTime)) ;check if statement is a declared variable, if so return the value.
+      (else                                              (error 'Interpreter "M-return error - Not accounted for")))))
 
 
 (define returnBinding
-  (lambda (toReturn stateList funcList next)
+  (lambda (toReturn stateList funcList next cTime)
     (if (null? toReturn)
-        (M-assign (list (cons 'var (list 'returnValue123 'null))) stateList funcList next)
-        (M-assign (list (cons 'var (list 'returnValue123 toReturn))) stateList funcList next))))
+        (M-assign (list (cons 'var (list 'returnValue123 'null))) stateList funcList next cTime)
+        (M-assign (list (cons 'var (list 'returnValue123 toReturn))) stateList funcList next cTime))))
 
 (define getReturnValue
-  (lambda (stateList)
-    (CheckBinding 'returnValue123 stateList)))
+  (lambda (stateList cTime)
+    (CheckBinding 'returnValue123 stateList cTime)))
 
 (define mainReturn
-  (lambda (stateList)
+  (lambda (stateList cTime)
     (cond
-      [(eq? #t (getReturnValue stateList)) 'true]
-      [(eq? #f (getReturnValue stateList)) 'false]
-      [else (getReturnValue stateList)])))
+      [(eq? #t (getReturnValue stateList cTime)) 'true]
+      [(eq? #f (getReturnValue stateList cTime)) 'false]
+      [else (getReturnValue stateList cTime)])))
   
 
 ;END
