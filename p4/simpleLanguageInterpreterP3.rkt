@@ -89,13 +89,59 @@ Project 3 - Imperitive Language Interpreter
 ;;Proper Functions
 ;;=====================================
 
+;; Create a class closure with parent, fields, methods, and constructors
+(define (create-class-closure class classlist)
+  (let* ((class-name (car class))
+         (extends (cadr class))
+         (parent-class (and extends (find-class classlist (cdr extends)))) ; Find parent class
+         (members (caddr class))
+         (fields (filter (lambda (x) (eq? 'var (car x))) members)) ; Extract fields
+         (methods (filter (lambda (x) (or (eq? 'function (car x)) 
+                                         (eq? 'static-function (car x)))) members)) ; Extract methods
+         (constructors (filter (lambda (x) (eq? 'constructor (car x))) members)) ; Extract constructors (optional)
+         (field-names (map car fields))
+         (field-values (map cadr fields))
+         (method-names-closures (map (lambda (x) (cons (cadr x) (cddr x))) methods)))
+    (list class-name parent-class field-names field-values method-names-closures constructors)))
+
+;; Create an instance closure
+(define (create-instance-closure class fields)
+  (list class fields))
+
+;; Access member (field or method) from a class closure
+(define (get-class-member closure member-name)
+  (let ((fields (cadr closure))
+        (methods (caddr closure)))
+    (cond ((assoc member-name fields) => cdr) ; retrieve field value if you find it in fields
+          ((assoc member-name methods) => cdr) ; retrieve method if you find it in methods
+          (else (error 'Interpreter "Member not found in class")))))
+
+;; Access field value from an instance closure
+(define (get-instance-field closure field-name)
+  (let ((fields (cadr closure)))
+    (cdr (assoc field-name fields))))
+
 ;interpret command - required, parses the input file and executes the code.
 (define interpret
   (lambda (filename)
     (call/cc
      (lambda (initialReturn)
-       (M-state (parser filename) initialState initialFunc (lambda (s f) (mainReturn (initialReturn (M-funcall '(funcall main) (push s) (push f) initialNext initialCTimeVars)) initialCTimeVars)) initialBreak initialThrow initialReturn initialCTimeVars)))))
-  
+       (M-state (parser filename) initialState initialFunc (lambda (s f) (initialReturn (M-funcall '(funcall main) (push s) (push f) initialNext))) initialBreak initialThrow initialReturn)))))
+
+(define find-class (lambda (class-list class-name)
+  (cond
+    ((null? class-list) (error 'Interpreter "find-class: Class not found"))
+    ((equal? (list (cadar class-list)) class-name) (create-class-closure (car class-list) class-list)) ; Access the correct sublist
+    (else (begin
+    (display (list (cadar class-list)))
+    (display class-name)
+    (display (cdr class-list))
+    (display "\n")
+    (find-class (cdr class-list) class-name)
+    )
+    )
+  )
+))
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
   (lambda (lis stateList funcList next break throw return cTime)

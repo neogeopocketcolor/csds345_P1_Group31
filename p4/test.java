@@ -1,11 +1,11 @@
 class B {
-  var c = 10;
+  var c = 13904;
   function test() {
     return 10;
   }
   static function main() {
     var b = new B();
-    return b.test();
+    return b.c;
   }
   var d = 10;
 }
