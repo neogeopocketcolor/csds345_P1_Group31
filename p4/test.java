@@ -7,6 +7,7 @@ class B {
     var b = new B();
     return b.test();
   }
+  var d = 10;
 }
 
 class A {
