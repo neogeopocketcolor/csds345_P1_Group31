@@ -91,12 +91,7 @@ Project 3 - Imperitive Language Interpreter
 
 #|
 Create helper functions to create a class closure and an instance closure and
-to access the members of the class closure and instance closure. The class closure
-must contain the parent/super class, the list of instance field names and the expressions
-that compute their initial values (if any), the list of methods/function names and closures,
-and (optionally) a list of class field names/values and a list of constructors. You may use
-your state/environment structure for each of these lists. The instance closure must contain
-the instance's class (i.e. the run-time type or the true type) and a list of instance field values.
+to access the members of the class closure and instance closure.
 |#
 ; class definition looks like this:
 ; '(class B (extends A) ((var c 10) (function test () ((return 10))) (static-function main () ())))
@@ -104,27 +99,36 @@ the instance's class (i.e. the run-time type or the true type) and a list of ins
 ; '(class A ((function test () ((return 10))) (static-function main () ())))
 (define create-class-closure (lambda (class-definition)
   ; class-definition is a list of the form (class <class-name> (extends <parent-class>) <class-body>)
-  ; class-body is a list of the form ((<field-definition>*) (<method-definition>*))
+  ; Fields and methods are interspersed. Fields are of the form (var <field-name> <initial-value>), and methods are of the form (function <method-name> (<parameter-list>) <method-body>).
   ; If the class extends another class:
   (if (eq? (cadr class-definition) 'extends)
-   (let ([parent-class (caddr class-definition)]
-         [class-body (cdddr class-definition)])
+   (let ([parent-class (cdadr class-definition)]
+         [class-body (caddr class-definition)])
+      ; First element in the class closure is the parent class
      (list parent-class
-           (map (lambda (field-definition)
-                  (list (caar field-definition) (cadar field-definition)))
-                (car class-body))
-           (map (lambda (method-definition)
-                  (list (caar method-definition) (cadar method-definition)))
-                (cadr class-body)))
+        ; Check if class-body is a list before calling map
+        (if (list? class-body)
+            (map (lambda (field-or-method)
+                   (if (eq? (car field-or-method) 'var)
+                       (list (cadr field-or-method) (caddr field-or-method))
+                       (list (cadr field-or-method) (lambda (instance-args) (caddr field-or-method))))
+                 class-body))
+            '() ; Return empty list if class-body is not a list
+        ))
     )
-    (let ([class-body (caddr class-definition)])
-      (list 'null
-            (map (lambda (field-definition)
-                    (list (caar field-definition) (cadar field-definition)))
-                  (car class-body))
-            (map (lambda (method-definition)
-                    (list (caar method-definition) (cadar method-definition)))
-                  (cadr class-body)))
+    ; If does not extend:
+    (let ([class-body (cadr class-definition)])
+      (list '() 
+        ; Check if class-body is a list before calling map
+        (if (list? class-body)
+            (map (lambda (field-or-method)
+                   (if (eq? (car field-or-method) 'var)
+                       (list (cadr field-or-method) (caddr field-or-method))
+                       (list (cadr field-or-method) (lambda (instance-args) (caddr field-or-method))))
+                 class-body)
+            )
+            '() ; Return empty list if class-body is not a list
+        ))
     )
   )
 ))
@@ -430,6 +434,6 @@ the instance's class (i.e. the run-time type or the true type) and a list of ins
 
 ;END
 (parser "p4/test.java")
-(create-class-closure '(class B (extends A) ((var c 10) (function test () ((return 10))) (static-function main () ()))))
+(create-class-closure '(B (extends A) ((var c 10) (function test () ((return 10))) (static-function main () ()))))
 ;(interpret "testthis.txt")
  
