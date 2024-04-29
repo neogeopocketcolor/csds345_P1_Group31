@@ -1,5 +1,5 @@
 #lang racket
-(require "classParser.rkt")
+(require "functionParser.rkt")
 
 #|
 
@@ -71,14 +71,14 @@ Project 3 - Imperitive Language Interpreter
 (define paramList car)
 (define commandList cadr)
 
-;parameterizing
-(define parameterizeCheckCdr
+;parametrizing
+(define parametizeCheckCdr
   (lambda (val)
     (if (list? val)
         (cdr val)
         val)))
 
-(define parameterizeCheckCar
+(define parametizeCheckCar
   (lambda (val)
     (if (list? val)
         (car val)
@@ -88,57 +88,12 @@ Project 3 - Imperitive Language Interpreter
 ;;Proper Functions
 ;;=====================================
 
-
-#|
-Create helper functions to create a class closure and an instance closure and
-to access the members of the class closure and instance closure.
-|#
-; class definition looks like this:
-; '(class B (extends A) ((var c 10) (function test () ((return 10))) (static-function main () ())))
-; If does not extend:
-; '(class A ((function test () ((return 10))) (static-function main () ())))
-(define create-class-closure (lambda (class-definition)
-  ; class-definition is a list of the form (class <class-name> (extends <parent-class>) <class-body>)
-  ; Fields and methods are interspersed. Fields are of the form (var <field-name> <initial-value>), and methods are of the form (function <method-name> (<parameter-list>) <method-body>).
-  ; If the class extends another class:
-  (if (eq? (cadr class-definition) 'extends)
-   (let ([parent-class (cdadr class-definition)]
-         [class-body (caddr class-definition)])
-      ; First element in the class closure is the parent class
-     (list parent-class
-        ; Check if class-body is a list before calling map
-        (if (list? class-body)
-            (map (lambda (field-or-method)
-                   (if (eq? (car field-or-method) 'var)
-                       (list (cadr field-or-method) (caddr field-or-method))
-                       (list (cadr field-or-method) (lambda (instance-args) (caddr field-or-method))))
-                 class-body))
-            '() ; Return empty list if class-body is not a list
-        ))
-    )
-    ; If does not extend:
-    (let ([class-body (cadr class-definition)])
-      (list '() 
-        ; Check if class-body is a list before calling map
-        (if (list? class-body)
-            (map (lambda (field-or-method)
-                   (if (eq? (car field-or-method) 'var)
-                       (list (cadr field-or-method) (caddr field-or-method))
-                       (list (cadr field-or-method) (lambda (instance-args) (caddr field-or-method))))
-                 class-body)
-            )
-            '() ; Return empty list if class-body is not a list
-        ))
-    )
-  )
-))
-
 ;interpret command - required, parses the input file and executes the code.
 (define interpret
   (lambda (filename)
     (call/cc
      (lambda (initialReturn)
-       (M-state (parser filename) initialState initialFunc (lambda (s f) (initialReturn (M-funcall '(funcall main) (push s) (push f) initialNext))) initialBreak initialThrow initialReturn)))))
+       (M-state (parser filename) initialState initialFunc (lambda (s f) (mainReturn (initialReturn (M-funcall '(funcall main) (push s) (push f) initialNext)))) initialBreak initialThrow initialReturn)))))
   
 ;M-state - updates the stateList based on the current command at the front of the list.
 (define M-state
@@ -180,6 +135,8 @@ to access the members of the class closure and instance closure.
       
       [(eq? (command lis) 'function) (M-declareFunction (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) stateList f next break throw return) funcList)))]
       [(eq? (command lis) 'funcall)  (M-funcall (statement lis) (push stateList) (push funcList) (lambda (s f) (next (M-state (nextStatement lis) (pop s) (pop f) next break throw return))))]
+      [(eq? (command lis) 'class)    (create-class-closure (statement lis) stateList funcList (lambda (s f) (next (M-state (nextStatement lis) s f next break throw return funcList))))]
+      ; PLACE HOLDER!!!                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       [else                          (error 'Interpreter "Not a valid command")])))
 
 
@@ -228,18 +185,18 @@ to access the members of the class closure and instance closure.
     (call/cc
      (lambda (initialReturn)
        (next (M-state (commandList (CheckFunctionBinding (leftoperand lis) funcList)) ;commands (lis)
-                      (list (parameterize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) stateList funcList next) (findGlobal stateList)) ;stateList
+                      (list (parametize (paramList (CheckFunctionBinding (leftoperand lis) funcList)) (cddr lis) stateList funcList next) (findGlobal stateList)) ;stateList
                       (push (list (findGlobal funcList))) ;funcList
                       initialNext initialBreak initialThrow initialReturn)
              funcList)))))
 
-;parameterize - takes list of formal and actual parameters and declares the formal parameters accordingly to the proper environment
-(define parameterize
+;parametize - takes list of formal and actual parameters and declares the formal parameters accordingly to the proper environment
+(define parametize
   (lambda (formal actual stateList funcList next)
     (cond
       [(and (null? formal) (not (null? actual))) (error 'Interpreter "Formal paremeters does not match number of actual paremeters.")]
       [(null? formal)                            (frontState stateList)]
-      [else (parameterize (cdr formal)             (parameterizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parameterizeCheckCar actual) (followingStates stateList) funcList next))) stateList funcList next) funcList next)])))
+      [else (parametize (cdr formal)             (parametizeCheckCdr actual) (M-declare (cons 'var (list (car formal) (M-expression (parametizeCheckCar actual) (followingStates stateList) funcList next))) stateList funcList next) funcList next)])))
 
 
 ;;=====================================
@@ -424,16 +381,22 @@ to access the members of the class closure and instance closure.
 (define returnBinding
   (lambda (toReturn stateList funcList next)
     (if (null? toReturn)
-        (M-assign (cons 'var (list 'returnValue123 'null)) stateList funcList next)
-        (M-assign (cons 'var (list 'returnValue123 toReturn)) stateList funcList next))))
+        (M-assign (list (cons 'var (list 'returnValue123 'null))) stateList funcList next)
+        (M-assign (list (cons 'var (list 'returnValue123 toReturn))) stateList funcList next))))
 
 (define getReturnValue
   (lambda (stateList)
     (CheckBinding 'returnValue123 stateList)))
+
+(define mainReturn
+  (lambda (stateList)
+    (cond
+      [(eq? #t (getReturnValue stateList)) 'true]
+      [(eq? #f (getReturnValue stateList)) 'false]
+      [else (getReturnValue stateList)])))
   
 
 ;END
-(parser "p4/test.java")
-(create-class-closure '(B (extends A) ((var c 10) (function test () ((return 10))) (static-function main () ()))))
-;(interpret "testthis.txt")
+;(parser "testthis.txt")
+(interpret "testthis.txt")
  
