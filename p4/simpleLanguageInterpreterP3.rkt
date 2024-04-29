@@ -99,14 +99,14 @@ Project 4 - Object-Oriented Language Interpreter
 (define class-method-names-closures (lambda (v) (map (lambda (x) (cons (cadr x) (cddr x))) (class-methods v))))
 
 ;; Create a class closure with parent, fields, methods, and constructors
-(define (create-class-closure class classlist)
+(define create-class-closure (lambda (class classlist)
   (let*
         ((extends (if (null? (class-parent class)) '() (class-parent class))) ; If no extends, default to Object
          (parent-class (if (eq? '() extends) '() (find-class classlist (cdr extends)))) ; Find parent class
         )
     (list (class-name class) parent-class (class-field-names class) (class-field-values class) (class-method-names-closures class) (class-constructors class))
  ) ; Create class closure
-)
+))
 
 ;; Get class main method
 (define (get-class-main closure)
@@ -138,17 +138,27 @@ Project 4 - Object-Oriented Language Interpreter
 )
 
 ;interpret command - required, parses the input file and executes the code.
-(define interpret
-  (lambda (filename)
-    (call/cc
-     (lambda (initialReturn)
-       (M-state (parser filename) initialState initialFunc (lambda (s f) (initialReturn (M-funcall '(funcall main) (push s) (push f) initialNext))) initialBreak initialThrow initialReturn '())))))
+(define (interpret filename class-name)
+  (call/cc
+   (lambda (initialReturn)
+     (let ((class-list (parser filename))) ; Parse the file
+       (let ((class-closure (find-class class-list (list (string->symbol class-name))))) ; Find the class closure
+         (let ((main-method (caddr (get-class-main class-closure)))) ; Get the main method
+           (M-state main-method initialState initialFunc (lambda (s f) (initialReturn (M-funcall '(funcall main) (push s) (push f) initialNext))) initialBreak initialThrow initialReturn '()))))))
+)
+
+
 
 (define find-class (lambda (class-list class-name)
   (cond
-    ((null? class-list) (error 'Interpreter "find-class: Class not found"))
+    ((null? class-list) (error 'Interpreter "find-class: Class not found: ~a" (car class-name)))
     ((equal? (list (cadar class-list)) class-name) (create-class-closure (cdar class-list) class-list)) ; Access the correct sublist
     (else (begin
+    (display (list (cadar class-list)))
+    (newline)
+    (display class-name)
+    (newline)
+    (display (cdr class-list))
     (find-class (cdr class-list) class-name)
     )
     )
@@ -222,8 +232,8 @@ Project 4 - Object-Oriented Language Interpreter
 (define M-declare
   (lambda (lis stateList funcList next cTime)
     (if (null? (value lis))
-        (next (AddBinding (varValue lis) stateList funcList cTime)) ;declare only
-        (M-assign lis (AddBinding (varValue lis) stateList funcList cTime) funcList next cTime)))) ;declare and assign
+        (next (AddBinding (varValue lis) stateList cTime)) ;declare only
+        (M-assign lis (AddBinding (varValue lis) stateList cTime) funcList next cTime)))) ;declare and assign
 
         
 ;M-assign - assigns a binding to a variable if the variable doesn't already have a value.
@@ -458,6 +468,6 @@ Project 4 - Object-Oriented Language Interpreter
   
 
 ;END
-;(parser "p4/test.java")
-;(interpret "p4/test.java")
-(get-class-main (create-class-closure '(B (extends A) ((var c 13904) (function test () ((return 10))) (static-function main () ((var b (new B)) (return (dot b c)))) (var d 10))) '((class B () ((var c 13904) (function test () ((return 10))) (static-function main () ((var b (new B)) (return (dot b c)))) (var d 10))) (class A () ((static-function main () ((return (funcall (dot B main))))))))))
+(parser "test.java")
+(interpret "test.java" "B")
+;(get-class-main (create-class-closure '(B (extends A) ((var c 13904) (function test () ((return 10))) (static-function main () ((var b (new B)) (return (dot b c)))) (var d 10))) '((class B () ((var c 13904) (function test () ((return 10))) (static-function main () ((var b (new B)) (return (dot b c)))) (var d 10))) (class A () ((static-function main () ((return (funcall (dot B main))))))))))

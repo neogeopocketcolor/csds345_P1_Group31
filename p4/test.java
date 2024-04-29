@@ -4,14 +4,8 @@ class B {
     return 10;
   }
   static function main() {
-    var b = new B();
-    return b.c;
+    var a = 7;
+    return 5;
   }
   var d = 10;
-}
-
-class A {
-  static function main() {
-    return B.main();
-  }
 }
